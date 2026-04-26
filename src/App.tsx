@@ -92,6 +92,14 @@ type AuthUser = {
   createdAt?: string;
 };
 
+type AdminUserAccount = {
+  id: string;
+  account: string;
+  name: string;
+  createdAt: string;
+  passwordStored: boolean;
+};
+
 const modules: Record<ModuleKey, { label: string; title: string; desc: string; icon: React.ReactNode }> = {
   groupbuy: {
     label: '团购',
@@ -825,12 +833,6 @@ function AIWorkspace({
             新建对话
           </button>
         </div>
-        <div className="px-4 pb-4">
-          <div className={cx('rounded-[24px] border p-4 shadow-sm', ui.surface)}>
-            <div className={cx('text-xs font-bold uppercase tracking-[0.18em]', ui.muted)}>Conversations</div>
-            <div className={cx('mt-2 text-lg font-black', ui.strong)}>自然有序的对话列表</div>
-          </div>
-        </div>
         <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4">
           {visibleConversations.length === 0 ? (
             <div className={cx('rounded-[24px] border border-dashed p-5 text-sm', ui.muted)}>还没有匹配到相关对话。</div>
@@ -1106,12 +1108,18 @@ function StaffHome({
   ui: ReturnType<typeof useThemeTokens>;
 }) {
   const [stats, setStats] = useState<{ users: number; userAccounts: number; staffAccounts: number; activeSessions: number } | null>(null);
+  const [userAccounts, setUserAccounts] = useState<AdminUserAccount[]>([]);
   const [error, setError] = useState('');
 
   async function loadStats() {
     setError('');
     try {
-      setStats(await apiRequest<{ users: number; userAccounts: number; staffAccounts: number; activeSessions: number }>('/admin/stats'));
+      const [statsResult, userAccountsResult] = await Promise.all([
+        apiRequest<{ users: number; userAccounts: number; staffAccounts: number; activeSessions: number }>('/admin/stats'),
+        apiRequest<AdminUserAccount[]>('/admin/users'),
+      ]);
+      setStats(statsResult);
+      setUserAccounts(userAccountsResult);
     } catch (err) {
       setError(err instanceof Error ? err.message : '统计接口请求失败');
     }
@@ -1139,6 +1147,47 @@ function StaffHome({
         <StatCard label="用户账号" value={String(stats?.userAccounts ?? 0)} icon={<UserRound className="h-5 w-5" />} ui={ui} />
         <StatCard label="工作者账号" value={String(stats?.staffAccounts ?? 0)} icon={<ShieldCheck className="h-5 w-5" />} ui={ui} />
         <StatCard label="本机对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} ui={ui} />
+      </div>
+      <div className={cx('rounded-[28px] border shadow-sm', ui.surface)}>
+        <div className="flex items-center justify-between border-b border-zinc-200 p-6 dark:border-zinc-800">
+          <div>
+            <h2 className={cx('text-2xl font-black', ui.strong)}>已注册用户</h2>
+            <p className={cx('mt-2 text-sm leading-7', ui.muted)}>用户注册的账号信息保存在工作者端，可在这里查看。</p>
+          </div>
+          <div className={cx('rounded-full px-4 py-2 text-sm font-black', ui.soft)}>
+            {userAccounts.length} 个账号
+          </div>
+        </div>
+        {userAccounts.length === 0 ? (
+          <div className={cx('p-8 text-sm', ui.muted)}>当前还没有用户注册记录。</div>
+        ) : (
+          <div className="app-scrollbar overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                  <th className="px-6 py-4 font-black">账号</th>
+                  <th className="px-6 py-4 font-black">名称</th>
+                  <th className="px-6 py-4 font-black">注册时间</th>
+                  <th className="px-6 py-4 font-black">密码状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userAccounts.map((item) => (
+                  <tr key={item.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-900">
+                    <td className="px-6 py-4 font-semibold">{item.account}</td>
+                    <td className="px-6 py-4">{item.name}</td>
+                    <td className="px-6 py-4">{new Date(item.createdAt).toLocaleString('zh-CN')}</td>
+                    <td className="px-6 py-4">
+                      <span className={cx('rounded-full px-3 py-1 text-xs font-black', item.passwordStored ? 'bg-zinc-950 text-white' : ui.soft)}>
+                        {item.passwordStored ? '已保存密码' : '未保存密码'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

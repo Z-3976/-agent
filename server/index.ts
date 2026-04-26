@@ -266,6 +266,21 @@ app.get('/api/admin/stats', async (_request, response) => {
   });
 });
 
+app.get('/api/admin/users', async (_request, response) => {
+  const db = await readDb();
+  const users = db.users
+    .filter((user) => user.role === 'user')
+    .map((user) => ({
+      id: user.id,
+      account: getUserAccount(user),
+      name: user.name,
+      createdAt: user.createdAt,
+      passwordStored: Boolean(user.passwordHash && user.passwordSalt),
+    }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  response.json(users);
+});
+
 app.post('/api/agent/chat-v2', async (request, response) => {
   const providers = getChatProviders();
   const body = request.body as AgentChatRequest;
