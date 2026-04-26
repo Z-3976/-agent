@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bot,
@@ -80,6 +80,7 @@ type AuthUser = {
   name: string;
 };
 
+
 const modules: Record<ModuleKey, { label: string; title: string; icon: React.ReactNode; desc: string }> = {
   groupbuy: {
     label: '团购',
@@ -128,6 +129,10 @@ function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+function isPasswordValid(password: string) {
+  return /^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(password);
+}
+
 function getPortalRole(): AppRole {
   return window.location.pathname.includes('/staff') || window.location.hash.includes('staff') ? 'staff' : 'user';
 }
@@ -143,6 +148,14 @@ function readStorage<T>(key: string, fallback: T): T {
 
 function nowLabel() {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function resetAppStorage() {
+  localStorage.removeItem('fitness_profile');
+  localStorage.removeItem('fitness_docs');
+  localStorage.removeItem('fitness_conversations');
+  localStorage.removeItem('fitness_user_user');
+  localStorage.removeItem('fitness_user_staff');
 }
 
 function moduleClasses(active: boolean) {
@@ -187,6 +200,14 @@ function AuthPage({ role, onAuthed }: { role: AppRole; onAuthed: (user: AuthUser
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError('');
+    if (mode === 'register' && !isPasswordValid(password)) {
+      setError('密码至少 6 位，且必须同时包含英文和数字');
+      return;
+    }
+    if (mode === 'register' && password !== passwordConfirm) {
+      setError('两次输入的密码不一致');
+      return;
+    }
     setLoading(true);
     try {
       const result = await apiRequest<{ user: AuthUser }>(
@@ -258,7 +279,7 @@ function AuthPage({ role, onAuthed }: { role: AppRole; onAuthed: (user: AuthUser
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-zinc-600">密码</span>
-                <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder="至少 6 位" />
+                <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder="至少 6 位，包含英文和数字" />
               </label>
               {mode === 'register' && (
                 <label className="block">
@@ -273,7 +294,7 @@ function AuthPage({ role, onAuthed }: { role: AppRole; onAuthed: (user: AuthUser
               {mode === 'register' ? '注册并进入' : '登录'}
             </button>
             <div className="mt-5 flex justify-between text-sm">
-              <a className="font-bold text-zinc-500 hover:text-zinc-950" href={role === 'staff' ? './user' : './staff'}>
+              <a className="font-bold text-zinc-500 hover:text-zinc-950" href={role === 'staff' ? '/user' : '/staff'}>
                 切换到{role === 'staff' ? '用户端' : '工作者端'}
               </a>
             </div>
@@ -613,7 +634,7 @@ function AgentWorkspace({
             新建对话
           </button>
         </div>
-        <div className="h-[calc(100vh-145px)] overflow-y-auto p-4">
+        <div className="app-scrollbar h-[calc(100vh-145px)] overflow-y-scroll p-4">
           {visibleConversations.length === 0 && <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-500">没有匹配的对话。</div>}
           {visibleConversations.map((item) => (
             <button
@@ -635,7 +656,7 @@ function AgentWorkspace({
         </div>
       </aside>
 
-      <main className="relative flex min-w-0 flex-col bg-zinc-50">
+      <main className="relative flex min-w-0 min-h-0 flex-col bg-zinc-50">
         <div className="border-b border-zinc-200 bg-white px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -655,7 +676,7 @@ function AgentWorkspace({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-8 pb-64">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-scroll px-6 py-8 pb-64">
           <div className="mx-auto max-w-4xl space-y-5">
             {messages.length === 0 ? (
               <div className="rounded-lg border border-zinc-200 bg-white p-6">
@@ -705,7 +726,7 @@ function AgentWorkspace({
           </div>
         </div>
 
-        <form onSubmit={send} className="fixed bottom-0 left-[600px] right-0 z-40 border-t border-zinc-200 bg-white/95 p-5 backdrop-blur max-[900px]:left-0">
+        <form onSubmit={send} className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 p-5 backdrop-blur md:left-[340px]">
           <div className="mx-auto max-w-4xl rounded-lg border border-zinc-200 bg-white p-4 shadow-lg">
             {attachments.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-2">
@@ -937,8 +958,9 @@ function KnowledgePage({ docs, setDocs }: { docs: KnowledgeDoc[]; setDocs: React
   );
 }
 
-function App() {
+function AppShell() {
   const [role] = useState<AppRole>(getPortalRole);
+  const [fatalError, setFatalError] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(() => readStorage<AuthUser | null>(`fitness_user_${getPortalRole()}`, null));
   const [view, setView] = useState<View>(() => (getPortalRole() === 'staff' ? 'staffHome' : 'home'));
   const [module, setModule] = useState<ModuleKey>('groupbuy');
@@ -965,6 +987,38 @@ function App() {
   useEffect(() => {
     localStorage.setItem('fitness_conversations', JSON.stringify(conversations));
   }, [conversations]);
+
+  useEffect(() => {
+    const handleError = () => setFatalError(true);
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleError);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleError);
+    };
+  }, []);
+
+  if (fatalError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-100 p-6">
+        <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-black text-zinc-950">页面加载失败</h1>
+          <p className="mt-3 text-sm leading-7 text-zinc-500">
+            可能是旧缓存数据或页面状态异常。清理本地缓存后会重新打开当前入口。
+          </p>
+          <button
+            onClick={() => {
+              resetAppStorage();
+              window.location.href = role === 'staff' ? '/staff' : '/user';
+            }}
+            className="mt-6 rounded-lg bg-zinc-950 px-5 py-3 font-black text-white"
+          >
+            清理缓存并重新进入
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) return <AuthPage role={role} onAuthed={setUser} />;
 
@@ -1002,6 +1056,10 @@ function App() {
       </div>
     </div>
   );
+}
+
+function App() {
+  return <AppShell />;
 }
 
 export default App;

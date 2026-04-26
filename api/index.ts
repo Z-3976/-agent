@@ -171,6 +171,10 @@ function createSession(db: Database, user: UserRecord) {
   return token;
 }
 
+function isPasswordValid(password: string) {
+  return /^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(password);
+}
+
 async function sendSmsCode(phone: string, code: string) {
   const provider = process.env.SMS_PROVIDER;
   if (!provider) {
@@ -301,7 +305,7 @@ app.post('/api/auth/register', async (request, response) => {
     typeof request.body.name === 'string' && request.body.name.trim() ? request.body.name.trim() : accountInfo?.account ?? '';
 
   if (!role || !accountInfo) return response.status(400).json({ message: '请输入正确的手机号或邮箱' });
-  if (password.length < 6) return response.status(400).json({ message: '密码至少 6 位' });
+  if (!isPasswordValid(password)) return response.status(400).json({ message: '密码至少 6 位，且必须同时包含英文和数字' });
   if (password !== passwordConfirm) return response.status(400).json({ message: '两次输入的密码不一致' });
 
   const db = await readDb();
@@ -354,7 +358,7 @@ app.post('/api/auth/register-legacy', async (request, response) => {
     typeof request.body.name === 'string' && request.body.name.trim() ? request.body.name.trim() : accountInfo?.account ?? '';
 
   if (!role || !phone) return response.status(400).json({ message: '角色或手机号不正确' });
-  if (password.length < 6) return response.status(400).json({ message: '密码至少 6 位' });
+  if (!isPasswordValid(password)) return response.status(400).json({ message: '密码至少 6 位，且必须同时包含英文和数字' });
 
   const db = await readDb();
   const exists = db.users.some((user) => user.role === role && user.phone === phone);

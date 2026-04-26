@@ -14,6 +14,12 @@
   body {
     @apply bg-zinc-50 text-zinc-900 antialiased;
   }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
 }
 
 .glass-panel {
@@ -26,4 +32,26 @@
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+.app-scrollbar {
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: #a1a1aa transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb {
+  background: #a1a1aa;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
 }
