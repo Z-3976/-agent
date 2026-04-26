@@ -482,8 +482,8 @@ function TopBar({
           </div>
         </div>
         {role === 'user' ? (
-          <div className="mx-auto w-full max-w-[500px]">
-            <div className="grid grid-cols-4 gap-3">
+          <div className="mx-auto flex w-full justify-center">
+            <div className="grid w-full max-w-[760px] grid-cols-4 gap-4">
               {(Object.keys(modules) as ModuleKey[]).map((key) => (
                 <div key={key} className="group relative">
                   <button
@@ -727,6 +727,8 @@ function Sidebar({
   user,
   view,
   setView,
+  search,
+  setSearch,
   onOpenAccount,
   ui,
 }: {
@@ -734,6 +736,8 @@ function Sidebar({
   user: AuthUser;
   view: View;
   setView: (view: View) => void;
+  search: string;
+  setSearch: React.Dispatch<React.SetStateAction<string>>;
   onOpenAccount: () => void;
   ui: ReturnType<typeof useThemeTokens>;
 }) {
@@ -764,6 +768,20 @@ function Sidebar({
             {item.label}
           </button>
         ))}
+        {role === 'user' ? (
+          <div className="pt-2">
+            <label className="group relative block">
+              <Search className={cx('pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 transition-all duration-300', ui.muted)} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onFocus={() => setView('history')}
+                className={cx('h-11 w-full rounded-full border bg-white/85 pl-11 pr-4 text-[13px] outline-none transition-all duration-300 focus:-translate-y-0.5 focus:border-zinc-950 focus:shadow-[0_10px_24px_rgba(15,23,42,0.10)]', ui.input)}
+                placeholder="搜索历史对话"
+              />
+            </label>
+          </div>
+        ) : null}
       </nav>
       <div className="mt-auto p-3">
         <button onClick={onOpenAccount} className={cx('flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 transition-all', ui.ghost)}>
@@ -817,16 +835,9 @@ function Home({
   setModule: (module: ModuleKey) => void;
   ui: ReturnType<typeof useThemeTokens>;
 }) {
-  const aiCount = conversations.flatMap((item) => item.messages).filter((message) => message.role === 'assistant' && message.content).length;
 
   return (
     <div className="space-y-5 p-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="历史对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} ui={ui} />
-        <StatCard label="启用资料" value={String(docs.filter((doc) => doc.active).length)} icon={<Database className="h-5 w-5" />} ui={ui} />
-        <StatCard label="本周输出" value={String(aiCount)} icon={<Sparkles className="h-5 w-5" />} ui={ui} />
-      </div>
-
       <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
         <section className={cx('rounded-[28px] border p-6 shadow-sm', ui.surface)}>
           <div className="flex items-center justify-between">
@@ -1134,7 +1145,7 @@ function AIWorkspace({
   }
 
   return (
-    <div className="grid h-[calc(100dvh-80px)] min-h-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-88px)] xl:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid h-[calc(100dvh-80px)] min-h-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-88px)] xl:grid-cols-[208px_minmax(0,1fr)]">
       <aside className={cx('hidden h-full min-h-0 overflow-hidden border-r xl:grid xl:grid-rows-[auto_minmax(0,1fr)_auto]', ui.surface)}>
         <div className="space-y-1.5 px-3 pt-4 pb-2">
           {navItems.map((item) => (
@@ -1906,7 +1917,7 @@ function AppShell() {
         ui={ui}
       />
       <div className="flex min-h-0">
-        <Sidebar role={effectiveRole} user={user} view={view} setView={setView} onOpenAccount={() => setAccountOpen(true)} ui={ui} />
+        <Sidebar role={effectiveRole} user={user} view={view} setView={setView} search={search} setSearch={setSearch} onOpenAccount={() => setAccountOpen(true)} ui={ui} />
         <main className="min-w-0 flex-1">{content}</main>
       </div>
       <AccountSettingsModal open={accountOpen} user={user} role={role} ui={ui} onClose={() => setAccountOpen(false)} onUpdated={setUser} />
