@@ -413,6 +413,7 @@ function AuthPage({
 function TopBar({
   role,
   onLogout,
+  onOpenAccount,
   view,
   setView,
   module,
@@ -426,6 +427,7 @@ function TopBar({
 }: {
   role: AppRole;
   onLogout: () => void;
+  onOpenAccount: () => void;
   view: View;
   setView: (view: View) => void;
   module: ModuleKey;
@@ -623,13 +625,17 @@ function TopBar({
                 <div className={cx('truncate text-[11px] font-bold', ui.muted)}>{role === 'staff' ? '工作者后台 · 运营管理端' : '用户后台 · 门店使用端'}</div>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <button className={cx('flex h-11 items-center justify-center rounded-full border transition-all', ui.ghost)}>
                 <Bell className="h-5 w-5" />
               </button>
               <button onClick={() => setThemeOpen((current) => !current)} className={cx('flex h-11 items-center justify-center gap-2 rounded-full border transition-all', ui.ghost)}>
                 {themeMode === 'dark' ? <Moon className="h-5 w-5" /> : themeMode === 'system' ? <Monitor className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 <ChevronDown className="h-4 w-4" />
+              </button>
+              <button onClick={onOpenAccount} className={cx('flex h-11 items-center justify-center gap-2 rounded-full border text-sm font-black transition-all', ui.ghost)}>
+                <Settings2 className="h-4 w-4" />
+                设置
               </button>
               <button onClick={onLogout} className={cx('flex h-11 items-center justify-center gap-2 rounded-full border text-sm font-black transition-all', ui.ghost)}>
                 <LogOut className="h-4 w-4" />
@@ -1795,6 +1801,7 @@ function AppShell() {
       <TopBar
         role={effectiveRole}
         onLogout={logout}
+        onOpenAccount={() => setAccountOpen(true)}
         view={view}
         setView={setView}
         module={module}
