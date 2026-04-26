@@ -13,6 +13,7 @@
 @layer base {
   html {
     color-scheme: light;
+    overflow-x: hidden;
   }
 
   html[data-theme='dark'] {
@@ -21,12 +22,19 @@
 
   body {
     @apply bg-zinc-50 text-[13px] text-zinc-900 antialiased;
+    overflow-x: hidden;
+    touch-action: pan-y;
   }
 
   html,
   body,
   #root {
     min-height: 100%;
+    max-width: 100%;
+  }
+
+  #root {
+    overflow-x: hidden;
   }
 
   button,
