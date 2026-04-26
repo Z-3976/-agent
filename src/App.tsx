@@ -393,6 +393,7 @@ function TopBar({
   user,
   search,
   setSearch,
+  onSearchSubmit,
   onLogout,
   onOpenAccount,
   themeMode,
@@ -403,6 +404,7 @@ function TopBar({
   user: AuthUser;
   search: string;
   setSearch: (value: string) => void;
+  onSearchSubmit: () => void;
   onLogout: () => void;
   onOpenAccount: () => void;
   themeMode: ThemeMode;
@@ -435,6 +437,12 @@ function TopBar({
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onSearchSubmit();
+              }
+            }}
             className={cx('h-[52px] w-full rounded-full border pl-14 pr-5 text-[15px] outline-none transition-all', ui.input)}
             placeholder="搜索对话、历史记录或运营指令"
           />
@@ -489,6 +497,12 @@ function TopBar({
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onSearchSubmit();
+            }
+          }}
           className={cx('h-12 w-full rounded-full border pl-14 pr-5 outline-none transition-all', ui.input)}
           placeholder="搜索工具、对话或指令"
         />
@@ -668,7 +682,7 @@ function AIWorkspace({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const active = conversations.find((item) => item.id === activeId) ?? conversations[0];
+  const active = conversations.find((item) => item.id === activeId);
   const messages = active?.messages ?? [];
   const activeDocs = docs.filter((doc) => doc.active && doc.module === module);
   const visibleConversations = conversations.filter((item) => {
@@ -676,10 +690,6 @@ function AIWorkspace({
     if (!keyword) return true;
     return [item.title, modules[item.module].label, ...item.messages.map((message) => message.content)].join(' ').toLowerCase().includes(keyword);
   });
-
-  useEffect(() => {
-    if (!activeId && conversations[0]) setActiveId(conversations[0].id);
-  }, [activeId, conversations]);
 
   useEffect(() => {
     if (selectedConversationId) setActiveId(selectedConversationId);
@@ -695,15 +705,9 @@ function AIWorkspace({
   }, [messages.length, generating, activeId]);
 
   function newConversation(nextModule = module) {
-    const next: Conversation = {
-      id: id('conv'),
-      title: `${modules[nextModule].label}新对话`,
-      module: nextModule,
-      updatedAt: '刚刚',
-      messages: [],
-    };
-    setConversations((current) => [next, ...current]);
-    setActiveId(next.id);
+    setActiveId('');
+    setInput('');
+    setAttachments([]);
     setModule(nextModule);
   }
 
@@ -883,23 +887,18 @@ function AIWorkspace({
           </div>
         </div>
 
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-56 md:px-6 md:py-5">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-44 md:px-6 md:py-5">
           <div className="mx-auto max-w-6xl space-y-4">
             {messages.length === 0 ? (
-              <section className={cx('rounded-[26px] border p-4 shadow-sm', ui.surface)}>
-                <div className="mb-3 inline-flex rounded-2xl bg-zinc-950 p-3 text-white">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <h2 className={cx('text-xl font-black', ui.strong)}>问一个具体问题</h2>
-                <p className={cx('mt-2 text-[15px] leading-7', ui.muted)}>AI 会结合门店资料和启用知识库，按当前模块输出更贴合业务的结构化方案。</p>
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="pt-2">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {starterPrompts[module].map((prompt) => (
                     <button key={prompt} onClick={() => setInput(prompt)} className={cx('rounded-[22px] border p-4 text-left text-sm font-bold leading-6 transition-all hover:-translate-y-0.5 hover:shadow-md', ui.surfaceAlt)}>
                       {prompt}
                     </button>
                   ))}
                 </div>
-              </section>
+              </div>
             ) : (
               messages.map((message) => (
                 <div key={message.id} className={cx('flex gap-4', message.role === 'user' ? 'justify-end' : 'justify-start')}>
@@ -934,7 +933,7 @@ function AIWorkspace({
           </div>
         </div>
 
-        <form onSubmit={send} className={cx('fixed bottom-0 left-0 right-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6 xl:left-[520px]', ui.surface)}>
+        <form onSubmit={send} className={cx('sticky bottom-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6', ui.surface)}>
           <div className={cx('mx-auto max-w-6xl rounded-[30px] border p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
             {attachments.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-2">
@@ -1457,6 +1456,24 @@ function AppShell() {
     setView('ai');
   }
 
+  function submitSearch() {
+    const keyword = search.trim().toLowerCase();
+    setView('ai');
+    if (!keyword) return;
+
+    const hit = conversations.find((item) =>
+      [item.title, modules[item.module].label, ...item.messages.map((message) => message.content)]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword),
+    );
+
+    if (hit) {
+      setSelectedConversationId(hit.id);
+      setModule(hit.module);
+    }
+  }
+
   const content = (() => {
     if (effectiveRole === 'staff') {
       if (view === 'knowledge') return <KnowledgePage docs={docs} setDocs={setDocs} ui={ui} />;
@@ -1492,6 +1509,7 @@ function AppShell() {
         user={user}
         search={search}
         setSearch={setSearch}
+        onSearchSubmit={submitSearch}
         onLogout={logout}
         onOpenAccount={() => setAccountOpen(true)}
         themeMode={themeMode}
