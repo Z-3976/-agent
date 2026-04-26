@@ -18,6 +18,7 @@ import {
   LogOut,
   Mail,
   MessageSquare,
+  Mic,
   Monitor,
   Moon,
   Package,
@@ -98,6 +99,17 @@ type AdminUserAccount = {
   name: string;
   createdAt: string;
   passwordStored: boolean;
+};
+
+type SpeechRecognitionCtor = new () => {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
 };
 
 const modules: Record<ModuleKey, { label: string; title: string; desc: string; icon: React.ReactNode }> = {
@@ -439,22 +451,28 @@ function TopBar({
           </div>
         </div>
         {role === 'user' ? (
-          <div className="mx-auto hidden flex-wrap gap-2 md:flex">
-            {(Object.keys(modules) as ModuleKey[]).map((key) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setModule(key);
-                  setView('ai');
-                }}
-                className={cx(
-                  'rounded-full border px-4 py-2.5 text-sm font-black transition-all',
-                  view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
-                )}
-              >
-                {modules[key].label}
-              </button>
-            ))}
+          <div className="mx-auto hidden w-full max-w-[560px] md:block">
+            <div className="grid grid-cols-4 gap-3">
+              {(Object.keys(modules) as ModuleKey[]).map((key) => (
+                <div key={key} className="group relative">
+                  <button
+                    onClick={() => {
+                      setModule(key);
+                      setView('ai');
+                    }}
+                    className={cx(
+                      'w-full rounded-full border px-0 py-2.5 text-center text-[13px] font-black transition-all',
+                      view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+                    )}
+                  >
+                    {modules[key].label}
+                  </button>
+                  <div className={cx('pointer-events-none absolute left-1/2 top-[calc(100%+10px)] z-50 hidden w-44 -translate-x-1/2 rounded-2xl border px-3 py-2 text-center text-[12px] leading-5 shadow-xl group-hover:block', ui.surface)}>
+                    {modules[key].desc}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : <div className="mx-auto" />}
         <div className="ml-auto flex items-center gap-2">
@@ -494,22 +512,25 @@ function TopBar({
         </div>
       </div>
       {role === 'user' ? (
-        <div className="mt-4 flex flex-wrap gap-2 md:hidden">
-          {(Object.keys(modules) as ModuleKey[]).map((key) => (
-            <button
-              key={key}
-              onClick={() => {
-                setModule(key);
-                setView('ai');
-              }}
-              className={cx(
-                'rounded-full border px-4 py-2.5 text-sm font-black transition-all',
-                view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
-              )}
-            >
-              {modules[key].label}
-            </button>
-          ))}
+        <div className="mt-4 md:hidden">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(Object.keys(modules) as ModuleKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setModule(key);
+                  setView('ai');
+                }}
+                title={modules[key].desc}
+                className={cx(
+                  'rounded-full border px-0 py-2.5 text-center text-[13px] font-black transition-all',
+                  view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+                )}
+              >
+                {modules[key].label}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
     </header>
@@ -547,21 +568,12 @@ function Sidebar({
 
   return (
     <aside className={cx(role === 'user' && view === 'ai' ? 'hidden' : 'hidden h-[calc(100vh-96px)] w-[208px] shrink-0 border-r xl:flex xl:flex-col', ui.surface)}>
-      <div className="p-3">
-        <div className={cx('rounded-[20px] border p-3.5 shadow-sm', ui.surfaceAlt)}>
-          <div className={cx('text-xs font-bold uppercase tracking-[0.22em]', ui.muted)}>{role === 'staff' ? 'Operations' : 'Workspace'}</div>
-          <div className={cx('mt-2.5 text-[28px] font-black leading-none', ui.strong)}>{role === 'staff' ? '工作者后台' : '用户后台'}</div>
-          <p className={cx('mt-3 text-sm leading-6', ui.muted)}>
-            {role === 'staff' ? '管理真实账号、知识库与对话记录。' : '用 AI 生成方案，管理门店资料和历史对话。'}
-          </p>
-        </div>
-      </div>
-      <nav className="space-y-1.5 px-3 pb-4">
+      <nav className="space-y-1.5 px-3 pt-4 pb-4">
         {items.map((item) => (
           <button
             key={item.key}
             onClick={() => setView(item.key)}
-            className={cx('flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] font-black transition-all', view === item.key ? ui.navActive : ui.nav)}
+            className={cx('flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[14px] font-black transition-all', view === item.key ? ui.navActive : ui.nav)}
           >
             {item.icon}
             {item.label}
@@ -701,9 +713,11 @@ function AIWorkspace({
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const speechRef = useRef<InstanceType<SpeechRecognitionCtor> | null>(null);
   const active = conversations.find((item) => item.id === activeId);
   const messages = active?.messages ?? [];
   const activeDocs = docs.filter((doc) => doc.active && doc.module === module);
@@ -739,6 +753,48 @@ function AIWorkspace({
     abortRef.current?.abort();
     abortRef.current = null;
     setGenerating(false);
+  }
+
+  function toggleVoice() {
+    const api = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const Ctor = api.SpeechRecognition || api.webkitSpeechRecognition;
+
+    if (!Ctor) {
+      window.alert('当前浏览器暂不支持语音识别');
+      return;
+    }
+
+    if (listening && speechRef.current) {
+      speechRef.current.stop();
+      return;
+    }
+
+    const recognition = new Ctor();
+    speechRef.current = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'zh-CN';
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript || '')
+        .join('')
+        .trim();
+
+      if (!transcript) return;
+      setInput((current) => (current ? `${current} ${transcript}` : transcript));
+    };
+    recognition.onerror = () => {
+      setListening(false);
+    };
+    recognition.onend = () => {
+      setListening(false);
+      speechRef.current = null;
+    };
+    setListening(true);
+    recognition.start();
   }
 
   async function send(event?: FormEvent) {
@@ -842,25 +898,18 @@ function AIWorkspace({
 
   return (
     <div className="grid h-[calc(100vh-96px)] grid-cols-1 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className={cx('hidden h-full border-r xl:grid xl:grid-rows-[minmax(0,1fr)_minmax(0,2fr)_auto]', ui.surface)}>
-        <div className="min-h-0 p-3 pb-2">
-          <div className={cx('flex h-full flex-col rounded-[24px] border p-4 shadow-sm', ui.surfaceAlt)}>
-            <div className={cx('text-xs font-bold uppercase tracking-[0.22em]', ui.muted)}>Workspace</div>
-            <div className={cx('mt-3 text-[30px] font-black leading-none', ui.strong)}>用户后台</div>
-            <p className={cx('mt-3 text-sm leading-6', ui.muted)}>用 AI 生成方案，管理门店资料和历史对话。</p>
-            <nav className="mt-5 space-y-1.5">
-              {navItems.map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => setView(item.key)}
-                  className={cx('flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] font-black transition-all', item.key === 'ai' ? ui.navActive : ui.nav)}
-                >
-                  {item.icon}
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+      <aside className={cx('hidden h-full border-r xl:grid xl:grid-rows-[auto_minmax(0,1fr)_auto]', ui.surface)}>
+        <div className="space-y-1.5 px-3 pt-4 pb-2">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setView(item.key)}
+              className={cx('flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[14px] font-black transition-all', item.key === 'ai' ? ui.navActive : ui.nav)}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
         </div>
         <div className="min-h-0 px-3 pb-3">
           <div className={cx('flex h-full min-h-0 flex-col rounded-[24px] border p-4 shadow-sm', ui.surfaceAlt)}>
@@ -908,7 +957,7 @@ function AIWorkspace({
 
       <main className="relative flex min-h-0 min-w-0 flex-col">
         <div className={cx('border-b px-6 py-5', ui.surface)}>
-          <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-4">
+          <div className="mx-auto flex w-full max-w-5xl flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white">
@@ -916,7 +965,7 @@ function AIWorkspace({
                 </div>
                 <div>
                   <h1 className={cx('text-xl font-black', ui.strong)}>{modules[module].title}</h1>
-                  <p className={cx('mt-1 text-[15px]', ui.muted)}>{modules[module].desc}</p>
+                  <p className={cx('mt-1 text-[13px]', ui.muted)}>{modules[module].desc}</p>
                 </div>
               </div>
             </div>
@@ -924,12 +973,12 @@ function AIWorkspace({
         </div>
 
         <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-44 md:px-6 md:py-5">
-          <div className="mx-auto max-w-6xl space-y-4">
+          <div className="mx-auto max-w-5xl space-y-4">
             {messages.length === 0 ? (
               <div className="pt-2">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2">
                   {starterPrompts[module].map((prompt) => (
-                    <button key={prompt} onClick={() => setInput(prompt)} className={cx('rounded-[22px] border p-4 text-left text-sm font-bold leading-6 transition-all hover:-translate-y-0.5 hover:shadow-md', ui.surfaceAlt)}>
+                    <button key={prompt} onClick={() => setInput(prompt)} className={cx('rounded-[22px] border p-4 text-left text-[13px] font-bold leading-6 transition-all hover:-translate-y-0.5 hover:shadow-md', ui.surfaceAlt)}>
                       {prompt}
                     </button>
                   ))}
@@ -937,18 +986,18 @@ function AIWorkspace({
               </div>
             ) : (
               messages.map((message) => (
-                <div key={message.id} className={cx('flex gap-4', message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                <div key={message.id} className={cx('flex gap-3', message.role === 'user' ? 'justify-end' : 'justify-start')}>
                   {message.role === 'assistant' ? (
                     <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
                       <Bot className="h-5 w-5" />
                     </div>
                   ) : null}
-                  <div className={cx('max-w-[980px] rounded-[26px] border p-4 shadow-sm', message.role === 'user' ? ui.bubbleUser : ui.bubbleAi)}>
+                  <div className={cx('max-w-[780px] rounded-[26px] border p-4 shadow-sm', message.role === 'user' ? ui.bubbleUser : ui.bubbleAi)}>
                     <div className="mb-3 flex items-center justify-between gap-8">
                       <span className={cx('text-sm font-black', message.role === 'user' ? 'text-zinc-300' : ui.strong)}>{message.role === 'user' ? '你' : modules[message.module].title}</span>
                       <span className="text-xs text-zinc-400">{message.createdAt}</span>
                     </div>
-                    <pre className="whitespace-pre-wrap break-words font-sans text-[15px] leading-7">{message.content || '收到，正在思考中'}</pre>
+                    <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{message.content || '收到，正在思考中'}</pre>
                     {message.attachments?.length ? <div className="mt-3 text-xs font-bold text-zinc-400">附件：{message.attachments.join('、')}</div> : null}
                     {message.role === 'assistant' && message.content ? (
                       <button onClick={() => navigator.clipboard?.writeText(message.content)} className={cx('mt-4 inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-black transition-all', ui.soft)}>
@@ -970,7 +1019,7 @@ function AIWorkspace({
         </div>
 
         <form onSubmit={send} className={cx('sticky bottom-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6', ui.surface)}>
-          <div className={cx('mx-auto max-w-6xl rounded-[30px] border p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
+          <div className={cx('mx-auto max-w-5xl rounded-[30px] border p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
             {attachments.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-2">
                 {attachments.map((file) => (
@@ -993,7 +1042,7 @@ function AIWorkspace({
                   send();
                 }
               }}
-              className={cx('h-28 w-full resize-none rounded-[22px] border p-4 text-sm leading-7 outline-none transition-all', ui.input)}
+              className={cx('h-28 w-full resize-none rounded-[22px] border p-4 text-[13px] leading-6 outline-none transition-all', ui.input)}
               placeholder="描述你的问题，例如：帮我做一个适合写字楼人群的 9.9 元团购套餐……"
             />
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -1015,6 +1064,9 @@ function AIWorkspace({
                 />
                 <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)} title="添加附件">
                   <Paperclip className="h-5 w-5" />
+                </button>
+                <button type="button" onClick={toggleVoice} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="语音识别">
+                  <Mic className="h-5 w-5" />
                 </button>
                 <span>最多 3 个附件，当前为文件名随消息保存</span>
               </div>
