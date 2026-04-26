@@ -120,9 +120,9 @@ const modules: Record<ModuleKey, { label: string; title: string; desc: string; i
     icon: <Radio className="h-5 w-5" />,
   },
   product: {
-    label: '包装',
-    title: '产品包装 AI',
-    desc: '优化商品标题、卖点、头图文案和详情结构。',
+    label: '门店运营',
+    title: '门店运营 AI',
+    desc: '梳理人员架构、薪资定价、健身房模式和经营策略。',
     icon: <Package className="h-5 w-5" />,
   },
 };
@@ -141,7 +141,7 @@ const starterPrompts: Record<ModuleKey, string[]> = {
   groupbuy: ['帮我做一个适合写字楼人群的 9.9 元团购套餐', '我的团购浏览多但转化少，帮我诊断', '设计团购购买后的私域承接 SOP'],
   video: ['给我写一个短视频脚本', '生成 7 天短视频选题', '把门店案例改成抖音脚本'],
   live: ['设计一场 60 分钟直播流程', '写直播开场 3 分钟留人话术', '用户说没时间训练怎么成交'],
-  product: ['包装一个 21 天减脂挑战营', '给私教体验课写 10 个标题', '优化课程卖点适合团购平台'],
+  product: ['帮我梳理一套门店人员架构', '设计适合当前门店的薪资和提成模型', '分析健身房模式并给出运营优化建议'],
 };
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -322,7 +322,7 @@ function AuthPage({
                 <div className="text-sm font-bold uppercase tracking-[0.24em] text-zinc-400">AI Fitness Ops</div>
                 <h1 className="mt-4 text-4xl font-black leading-tight">AI健身房运营助手</h1>
                 <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-300">
-                  把门店资料、知识库和 AI 对话连接起来，生成真正可落地的团购、短视频、直播和产品包装方案。
+                  把门店资料、知识库和 AI 对话连接起来，生成真正可落地的团购、短视频、直播和门店运营方案。
                 </p>
               </div>
             </div>
@@ -398,23 +398,21 @@ function AuthPage({
 
 function TopBar({
   role,
-  user,
-  search,
-  setSearch,
-  onSearchSubmit,
   onLogout,
-  onOpenAccount,
+  view,
+  setView,
+  module,
+  setModule,
   themeMode,
   setThemeMode,
   ui,
 }: {
   role: AppRole;
-  user: AuthUser;
-  search: string;
-  setSearch: (value: string) => void;
-  onSearchSubmit: () => void;
   onLogout: () => void;
-  onOpenAccount: () => void;
+  view: View;
+  setView: (view: View) => void;
+  module: ModuleKey;
+  setModule: React.Dispatch<React.SetStateAction<ModuleKey>>;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
   ui: ReturnType<typeof useThemeTokens>;
@@ -440,21 +438,25 @@ function TopBar({
             <div className={cx('truncate text-[12px] font-bold', ui.muted)}>{role === 'staff' ? '工作者后台 · 运营管理端' : '用户后台 · 门店使用端'}</div>
           </div>
         </div>
-        <label className="relative mx-auto hidden w-full max-w-[560px] md:block">
-          <Search className={cx('absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2', ui.muted)} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSearchSubmit();
-              }
-            }}
-            className={cx('h-[52px] w-full rounded-full border pl-14 pr-5 text-[15px] outline-none transition-all', ui.input)}
-            placeholder="搜索对话、历史记录或运营指令"
-          />
-        </label>
+        {role === 'user' ? (
+          <div className="mx-auto hidden flex-wrap gap-2 md:flex">
+            {(Object.keys(modules) as ModuleKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setModule(key);
+                  setView('ai');
+                }}
+                className={cx(
+                  'rounded-full border px-4 py-2.5 text-sm font-black transition-all',
+                  view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+                )}
+              >
+                {modules[key].label}
+              </button>
+            ))}
+          </div>
+        ) : <div className="mx-auto" />}
         <div className="ml-auto flex items-center gap-2">
           <button className={cx('flex h-12 w-12 items-center justify-center rounded-full border transition-all', ui.ghost)} title="提醒">
             <Bell className="h-5 w-5" />
@@ -489,32 +491,27 @@ function TopBar({
             <LogOut className="h-4 w-4" />
             退出
           </button>
-          <button onClick={onOpenAccount} className={cx('flex h-12 items-center gap-3 rounded-full border px-3 pr-4 transition-all', ui.ghost)}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white">
-              {(user.name || user.account).slice(0, 1).toUpperCase()}
-            </div>
-            <div className="hidden text-left md:block">
-              <div className={cx('max-w-[110px] truncate text-sm font-black', ui.strong)}>{user.name || '未命名用户'}</div>
-              <div className={cx('max-w-[110px] truncate text-xs', ui.muted)}>{user.account}</div>
-            </div>
-          </button>
         </div>
       </div>
-      <label className="relative mt-4 block md:hidden">
-        <Search className={cx('absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2', ui.muted)} />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onSearchSubmit();
-            }
-          }}
-          className={cx('h-12 w-full rounded-full border pl-14 pr-5 outline-none transition-all', ui.input)}
-          placeholder="搜索工具、对话或指令"
-        />
-      </label>
+      {role === 'user' ? (
+        <div className="mt-4 flex flex-wrap gap-2 md:hidden">
+          {(Object.keys(modules) as ModuleKey[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => {
+                setModule(key);
+                setView('ai');
+              }}
+              className={cx(
+                'rounded-full border px-4 py-2.5 text-sm font-black transition-all',
+                view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+              )}
+            >
+              {modules[key].label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -524,12 +521,14 @@ function Sidebar({
   user,
   view,
   setView,
+  onOpenAccount,
   ui,
 }: {
   role: AppRole;
   user: AuthUser;
   view: View;
   setView: (view: View) => void;
+  onOpenAccount: () => void;
   ui: ReturnType<typeof useThemeTokens>;
 }) {
   const items =
@@ -547,7 +546,7 @@ function Sidebar({
         ];
 
   return (
-    <aside className={cx('hidden h-[calc(100vh-96px)] w-[208px] shrink-0 border-r xl:flex xl:flex-col', ui.surface)}>
+    <aside className={cx(role === 'user' && view === 'ai' ? 'hidden' : 'hidden h-[calc(100vh-96px)] w-[208px] shrink-0 border-r xl:flex xl:flex-col', ui.surface)}>
       <div className="p-3">
         <div className={cx('rounded-[20px] border p-3.5 shadow-sm', ui.surfaceAlt)}>
           <div className={cx('text-xs font-bold uppercase tracking-[0.22em]', ui.muted)}>{role === 'staff' ? 'Operations' : 'Workspace'}</div>
@@ -569,6 +568,17 @@ function Sidebar({
           </button>
         ))}
       </nav>
+      <div className="mt-auto p-3">
+        <button onClick={onOpenAccount} className={cx('flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 transition-all', ui.ghost)}>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white">
+            {(user.name || user.account).slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 text-left">
+            <div className={cx('truncate text-sm font-black', ui.strong)}>{user.name || '未命名用户'}</div>
+            <div className={cx('truncate text-xs', ui.muted)}>{user.account}</div>
+          </div>
+        </button>
+      </div>
     </aside>
   );
 }
@@ -669,8 +679,10 @@ function AIWorkspace({
   setConversations,
   module,
   setModule,
-  search,
   selectedConversationId,
+  user,
+  setView,
+  onOpenAccount,
   ui,
 }: {
   profile: StoreProfile;
@@ -679,8 +691,10 @@ function AIWorkspace({
   setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
   module: ModuleKey;
   setModule: React.Dispatch<React.SetStateAction<ModuleKey>>;
-  search: string;
   selectedConversationId: string;
+  user: AuthUser;
+  setView: (view: View) => void;
+  onOpenAccount: () => void;
   ui: ReturnType<typeof useThemeTokens>;
 }) {
   const [activeId, setActiveId] = useState(conversations[0]?.id ?? '');
@@ -693,11 +707,13 @@ function AIWorkspace({
   const active = conversations.find((item) => item.id === activeId);
   const messages = active?.messages ?? [];
   const activeDocs = docs.filter((doc) => doc.active && doc.module === module);
-  const visibleConversations = conversations.filter((item) => {
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return true;
-    return [item.title, modules[item.module].label, ...item.messages.map((message) => message.content)].join(' ').toLowerCase().includes(keyword);
-  });
+  const visibleConversations = conversations;
+  const navItems = [
+    { key: 'home' as View, label: '用户首页', icon: <LayoutDashboard className="h-5 w-5" /> },
+    { key: 'ai' as View, label: 'AI 对话', icon: <Bot className="h-5 w-5" /> },
+    { key: 'history' as View, label: '我的历史', icon: <History className="h-5 w-5" /> },
+    { key: 'profile' as View, label: '门店资料', icon: <Building2 className="h-5 w-5" /> },
+  ];
 
   useEffect(() => {
     if (selectedConversationId) setActiveId(selectedConversationId);
@@ -825,17 +841,36 @@ function AIWorkspace({
   }
 
   return (
-    <div className="grid h-[calc(100vh-96px)] grid-cols-1 overflow-hidden xl:grid-cols-[252px_minmax(0,1fr)]">
-      <aside className={cx('hidden border-r xl:flex xl:flex-col', ui.surfaceAlt)}>
-        <div className="p-4">
-          <button onClick={() => newConversation()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 text-sm font-black text-white">
-            <Plus className="h-4 w-4" />
-            新建对话
-          </button>
+    <div className="grid h-[calc(100vh-96px)] grid-cols-1 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className={cx('hidden h-full border-r xl:grid xl:grid-rows-[minmax(0,1fr)_minmax(0,2fr)_auto]', ui.surface)}>
+        <div className="min-h-0 p-3 pb-2">
+          <div className={cx('flex h-full flex-col rounded-[24px] border p-4 shadow-sm', ui.surfaceAlt)}>
+            <div className={cx('text-xs font-bold uppercase tracking-[0.22em]', ui.muted)}>Workspace</div>
+            <div className={cx('mt-3 text-[30px] font-black leading-none', ui.strong)}>用户后台</div>
+            <p className={cx('mt-3 text-sm leading-6', ui.muted)}>用 AI 生成方案，管理门店资料和历史对话。</p>
+            <nav className="mt-5 space-y-1.5">
+              {navItems.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setView(item.key)}
+                  className={cx('flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] font-black transition-all', item.key === 'ai' ? ui.navActive : ui.nav)}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
         </div>
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+        <div className="min-h-0 px-3 pb-3">
+          <div className={cx('flex h-full min-h-0 flex-col rounded-[24px] border p-4 shadow-sm', ui.surfaceAlt)}>
+            <button onClick={() => newConversation()} className="flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 text-sm font-black text-white">
+              <Plus className="h-4 w-4" />
+              新建对话
+            </button>
+            <div className="app-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
           {visibleConversations.length === 0 ? (
-            <div className={cx('rounded-[24px] border border-dashed p-5 text-sm', ui.muted)}>还没有匹配到相关对话。</div>
+                <div className={cx('rounded-[24px] border border-dashed p-5 text-sm', ui.muted)}>还没有历史对话。</div>
           ) : (
             visibleConversations.map((item) => (
               <button
@@ -855,6 +890,19 @@ function AIWorkspace({
               </button>
             ))
           )}
+            </div>
+          </div>
+        </div>
+        <div className="p-3 pt-0">
+          <button onClick={onOpenAccount} className={cx('flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 transition-all', ui.ghost)}>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white">
+              {(user.name || user.account).slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0 text-left">
+              <div className={cx('truncate text-sm font-black', ui.strong)}>{user.name || '未命名用户'}</div>
+              <div className={cx('truncate text-xs', ui.muted)}>{user.account}</div>
+            </div>
+          </button>
         </div>
       </aside>
 
@@ -871,20 +919,6 @@ function AIWorkspace({
                   <p className={cx('mt-1 text-[15px]', ui.muted)}>{modules[module].desc}</p>
                 </div>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(modules) as ModuleKey[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => (active?.messages.length ? newConversation(key) : setModule(key))}
-                  className={cx(
-                    'rounded-full border px-4 py-2.5 text-sm font-black transition-all',
-                    module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
-                  )}
-                >
-                  {modules[key].label}
-                </button>
-              ))}
             </div>
           </div>
         </div>
@@ -1539,8 +1573,10 @@ function AppShell() {
           setConversations={setConversations}
           module={module}
           setModule={setModule}
-          search={search}
           selectedConversationId={selectedConversationId}
+          user={user}
+          setView={setView}
+          onOpenAccount={() => setAccountOpen(true)}
           ui={ui}
         />
       );
@@ -1555,18 +1591,17 @@ function AppShell() {
     <div className={cx('min-h-screen', ui.page)}>
       <TopBar
         role={effectiveRole}
-        user={user}
-        search={search}
-        setSearch={setSearch}
-        onSearchSubmit={submitSearch}
         onLogout={logout}
-        onOpenAccount={() => setAccountOpen(true)}
+        view={view}
+        setView={setView}
+        module={module}
+        setModule={setModule}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
         ui={ui}
       />
       <div className="flex">
-        <Sidebar role={effectiveRole} user={user} view={view} setView={setView} ui={ui} />
+        <Sidebar role={effectiveRole} user={user} view={view} setView={setView} onOpenAccount={() => setAccountOpen(true)} ui={ui} />
         <main className="min-w-0 flex-1">{content}</main>
       </div>
       <AccountSettingsModal open={accountOpen} user={user} role={role} ui={ui} onClose={() => setAccountOpen(false)} onUpdated={setUser} />
