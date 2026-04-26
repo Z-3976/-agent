@@ -42,6 +42,13 @@ type AgentChatRequest = {
   messages?: Array<{ role?: 'user' | 'assistant'; content?: string }>;
 };
 
+type ChatProviderConfig = {
+  name: 'openai' | 'minimax';
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+};
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.VERCEL ? path.join(os.tmpdir(), 'fitness-ai-data') : path.join(__dirname, 'data');
 const dbPath = path.join(dataDir, 'db.json');
@@ -175,6 +182,30 @@ function isPasswordValid(password: string) {
   return /^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(password);
 }
 
+function getChatProviders(): ChatProviderConfig[] {
+  const providers: ChatProviderConfig[] = [];
+
+  if (process.env.OPENAI_API_KEY) {
+    providers.push({
+      name: 'openai',
+      apiKey: process.env.OPENAI_API_KEY,
+      baseUrl: (process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, ''),
+      model: process.env.OPENAI_MODEL ?? 'gpt-4.1-mini',
+    });
+  }
+
+  if (process.env.LLM_API_KEY) {
+    providers.push({
+      name: 'minimax',
+      apiKey: process.env.LLM_API_KEY,
+      baseUrl: (process.env.LLM_BASE_URL ?? 'https://api.minimaxi.com/v1').replace(/\/$/, ''),
+      model: process.env.LLM_MODEL ?? 'MiniMax-M2.1',
+    });
+  }
+
+  return providers;
+}
+
 async function sendSmsCode(phone: string, code: string) {
   const provider = process.env.SMS_PROVIDER;
   if (!provider) {
@@ -209,12 +240,18 @@ async function sendSmsCode(phone: string, code: string) {
 }
 
 app.get('/api/health', (_request, response) => {
+  const providers = getChatProviders();
   response.json({
     ok: true,
     smsConfigured: Boolean(process.env.SMS_PROVIDER),
-    llmConfigured: Boolean(process.env.LLM_API_KEY),
+    llmConfigured: providers.length > 0,
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    minimaxConfigured: Boolean(process.env.LLM_API_KEY),
     llmBaseUrl: process.env.LLM_BASE_URL ?? 'https://api.minimaxi.com/v1',
     llmModel: process.env.LLM_MODEL ?? 'MiniMax-M2.1',
+    openaiBaseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+    openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4.1-mini',
+    activeProviders: providers.map((provider) => provider.name),
     provider: process.env.SMS_PROVIDER ?? null,
   });
 });
@@ -229,7 +266,84 @@ app.get('/api/admin/stats', async (_request, response) => {
   });
 });
 
-app.post('/api/agent/chat', async (request, response) => {
+app.post('/api/agent/chat-v2', async (request, response) => {
+  const providers = getChatProviders();
+  const body = request.body as AgentChatRequest;
+  const question = typeof body.question === 'string' ? body.question.trim() : '';
+  const module = body.module ?? 'groupbuy';
+
+  if (providers.length === 0) return response.status(500).json({ message: '未配置可用的 AI 密钥' });
+  if (!question) return response.status(400).json({ message: '问题不能为空' });
+
+  const moduleName: Record<ModuleKey, string> = {
+    groupbuy: '团购运营',
+    video: '短视频内容',
+    live: '直播转化',
+    product: '产品包装',
+  };
+  const profile = body.profile ?? {};
+  const docs = Array.isArray(body.docs) ? body.docs : [];
+  const history = Array.isArray(body.messages) ? body.messages.slice(-8) : [];
+  const messages = [
+    {
+      role: 'system',
+      content:
+        '你是健身房门店运营 AI。必须基于门店资料和知识库输出可执行方案，避免泛泛而谈。用中文回答，结构清晰，适合直接复制给门店运营人员。不要输出思考过程、think 标签或内部推理。',
+    },
+    {
+      role: 'user',
+      content: [
+        `当前模块：${moduleName[module]}`,
+        `门店资料：${JSON.stringify(profile)}`,
+        `启用知识库：${JSON.stringify(docs)}`,
+        `最近对话：${JSON.stringify(history)}`,
+        `用户问题：${question}`,
+      ].join('\n\n'),
+    },
+  ];
+
+  const errors: string[] = [];
+  for (const provider of providers) {
+    try {
+      const upstream = await fetch(`${provider.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${provider.apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: provider.model,
+          temperature: 0.35,
+          messages,
+        }),
+      });
+
+      const data = (await upstream.json().catch(() => ({}))) as {
+        choices?: Array<{ message?: { content?: string } }>;
+        error?: { message?: string };
+        message?: string;
+      };
+
+      if (!upstream.ok) {
+        errors.push(`${provider.name}:${data.error?.message || data.message || upstream.status}`);
+        continue;
+      }
+
+      const content = data.choices?.[0]?.message?.content?.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      if (content) {
+        return response.json({ content, provider: provider.name, model: provider.model });
+      }
+
+      errors.push(`${provider.name}:empty_response`);
+    } catch (error) {
+      errors.push(`${provider.name}:${error instanceof Error ? error.message : 'request_failed'}`);
+    }
+  }
+
+  response.status(502).json({ message: `AI 接口请求失败：${errors.join(' | ')}` });
+});
+
+app.post('/api/agent/chat-legacy', async (request, response) => {
   const apiKey = process.env.LLM_API_KEY;
   const baseUrl = (process.env.LLM_BASE_URL ?? 'https://api.minimaxi.com/v1').replace(/\/$/, '');
   const model = process.env.LLM_MODEL ?? 'MiniMax-M2.1';

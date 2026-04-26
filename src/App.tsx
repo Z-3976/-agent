@@ -781,7 +781,7 @@ function AIWorkspace({
     abortRef.current = controller;
 
     try {
-      const result = await apiRequestWithSignal<{ content: string }>('/agent/chat', {
+      const result = await apiRequestWithSignal<{ content: string }>('/agent/chat-v2', {
         question,
         module,
         profile,
@@ -924,7 +924,7 @@ function AIWorkspace({
                       <span className={cx('text-sm font-black', message.role === 'user' ? 'text-zinc-300' : ui.strong)}>{message.role === 'user' ? '你' : modules[message.module].title}</span>
                       <span className="text-xs text-zinc-400">{message.createdAt}</span>
                     </div>
-                    <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7">{message.content || '正在调用 AI 接口...'}</pre>
+                    <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7">{message.content || '收到，正在思考中'}</pre>
                     {message.attachments?.length ? <div className="mt-3 text-xs font-bold text-zinc-400">附件：{message.attachments.join('、')}</div> : null}
                     {message.role === 'assistant' && message.content ? (
                       <button onClick={() => navigator.clipboard?.writeText(message.content)} className={cx('mt-4 inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-black transition-all', ui.soft)}>
