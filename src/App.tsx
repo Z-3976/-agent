@@ -417,6 +417,9 @@ function TopBar({
   setView,
   module,
   setModule,
+  conversations,
+  onOpenConversation,
+  onNewConversation,
   themeMode,
   setThemeMode,
   ui,
@@ -427,6 +430,9 @@ function TopBar({
   setView: (view: View) => void;
   module: ModuleKey;
   setModule: React.Dispatch<React.SetStateAction<ModuleKey>>;
+  conversations: Conversation[];
+  onOpenConversation: (id: string, module: ModuleKey) => void;
+  onNewConversation: () => void;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
   ui: ReturnType<typeof useThemeTokens>;
@@ -441,6 +447,7 @@ function TopBar({
     { key: 'dark', label: '深色模式', icon: <Moon className="h-5 w-5" /> },
     { key: 'system', label: '跟随系统', icon: <Monitor className="h-5 w-5" /> },
   ];
+  const recentConversations = conversations.slice(0, 5);
 
   return (
     <header className={cx('sticky top-0 z-40 border-b px-4 py-3 backdrop-blur-xl md:px-5 md:py-4', ui.surface)}>
@@ -480,7 +487,7 @@ function TopBar({
           </div>
         ) : <div className="mx-auto" />}
         <div className="ml-auto flex items-center gap-2">
-          <button className={cx('flex h-12 w-12 items-center justify-center rounded-full border transition-all', ui.ghost)} title="???">
+          <button className={cx('flex h-12 w-12 items-center justify-center rounded-full border transition-all', ui.ghost)} title="提醒">
             <Bell className="h-5 w-5" />
           </button>
           <div className="relative">
@@ -511,7 +518,7 @@ function TopBar({
           </div>
           <button onClick={onLogout} className={cx('flex h-12 items-center gap-2 rounded-full border px-4 text-sm font-black transition-all', ui.ghost)}>
             <LogOut className="h-4 w-4" />
-            ????
+            退出
           </button>
         </div>
       </div>
@@ -534,8 +541,79 @@ function TopBar({
           </button>
         </div>
 
-        {mobileHeaderOpen ? (
-          <div className={cx('mt-3 rounded-[24px] border p-3 shadow-sm', ui.surface)}>
+        {role === 'user' ? (
+          <div
+            className={cx(
+              'overflow-hidden transition-all duration-300 ease-out',
+              mobileModuleOpen ? 'mt-3 max-h-[520px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none',
+            )}
+          >
+            <div className={cx('rounded-[24px] border p-3 shadow-sm', ui.surface)}>
+              <button
+                onClick={() => {
+                  onNewConversation();
+                  setMobileModuleOpen(false);
+                }}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 text-sm font-black text-white"
+              >
+                <Plus className="h-4 w-4" />
+                新建对话
+              </button>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {(Object.keys(modules) as ModuleKey[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setModule(key);
+                      setView('ai');
+                      setMobileModuleOpen(false);
+                    }}
+                    title={modules[key].desc}
+                    className={cx(
+                      'rounded-full border px-0 py-2.5 text-center text-[13px] font-black transition-all',
+                      view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+                    )}
+                  >
+                    {modules[key].label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 border-t pt-3">
+                <div className={cx('mb-2 text-[12px] font-bold uppercase tracking-[0.18em]', ui.muted)}>最近对话</div>
+                <div className="space-y-2">
+                  {recentConversations.length === 0 ? (
+                    <div className={cx('rounded-[18px] border border-dashed px-4 py-3 text-sm', ui.muted)}>还没有历史记录</div>
+                  ) : (
+                    recentConversations.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onOpenConversation(item.id, item.module);
+                          setMobileModuleOpen(false);
+                        }}
+                        className={cx('w-full rounded-[18px] border px-4 py-3 text-left transition-all', ui.surfaceAlt)}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className={cx('rounded-full px-3 py-1 text-[11px] font-black', ui.soft)}>{modules[item.module].label}</span>
+                          <span className={cx('text-[11px] font-bold', ui.muted)}>{item.updatedAt}</span>
+                        </div>
+                        <div className={cx('mt-2 truncate text-sm font-black', ui.strong)}>{item.title}</div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div
+          className={cx(
+            'overflow-hidden transition-all duration-300 ease-out',
+            mobileHeaderOpen ? 'mt-3 max-h-[420px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none',
+          )}
+        >
+          <div className={cx('rounded-[24px] border p-3 shadow-sm', ui.surface)}>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
                 <Dumbbell className="h-6 w-6" />
@@ -555,11 +633,16 @@ function TopBar({
               </button>
               <button onClick={onLogout} className={cx('flex h-11 items-center justify-center gap-2 rounded-full border text-sm font-black transition-all', ui.ghost)}>
                 <LogOut className="h-4 w-4" />
-                ????
+                退出
               </button>
             </div>
-            {themeOpen ? (
-              <div className={cx('mt-3 rounded-[20px] border p-2', ui.surfaceAlt)}>
+            <div
+              className={cx(
+                'overflow-hidden transition-all duration-300 ease-out',
+                themeOpen ? 'mt-3 max-h-64 opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
+              )}
+            >
+              <div className={cx('rounded-[20px] border p-2', ui.surfaceAlt)}>
                 {themeOptions.map((option) => (
                   <button
                     key={option.key}
@@ -577,33 +660,9 @@ function TopBar({
                   </button>
                 ))}
               </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {role === 'user' && mobileModuleOpen ? (
-          <div className={cx('mt-3 rounded-[24px] border p-3 shadow-sm', ui.surface)}>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(modules) as ModuleKey[]).map((key) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setModule(key);
-                    setView('ai');
-                    setMobileModuleOpen(false);
-                  }}
-                  title={modules[key].desc}
-                  className={cx(
-                    'rounded-full border px-0 py-2.5 text-center text-[13px] font-black transition-all',
-                    view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
-                  )}
-                >
-                  {modules[key].label}
-                </button>
-              ))}
             </div>
           </div>
-        ) : null}
+        </div>
       </div>
     </header>
   );
@@ -764,6 +823,7 @@ function AIWorkspace({
   module,
   setModule,
   selectedConversationId,
+  newConversationNonce,
   user,
   setView,
   onOpenAccount,
@@ -776,6 +836,7 @@ function AIWorkspace({
   module: ModuleKey;
   setModule: React.Dispatch<React.SetStateAction<ModuleKey>>;
   selectedConversationId: string;
+  newConversationNonce: number;
   user: AuthUser;
   setView: (view: View) => void;
   onOpenAccount: () => void;
@@ -790,6 +851,7 @@ function AIWorkspace({
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const speechRef = useRef<InstanceType<SpeechRecognitionCtor> | null>(null);
+  const mountedRef = useRef(false);
   const active = conversations.find((item) => item.id === activeId);
   const messages = active?.messages ?? [];
   const activeDocs = docs.filter((doc) => doc.active && doc.module === module);
@@ -804,6 +866,14 @@ function AIWorkspace({
   useEffect(() => {
     if (selectedConversationId) setActiveId(selectedConversationId);
   }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    newConversation();
+  }, [newConversationNonce]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -1105,10 +1175,10 @@ function AIWorkspace({
               />
 
               <div className="mt-3 grid grid-cols-3 gap-2 sm:hidden">
-                <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-11 items-center justify-center rounded-full border transition-all', ui.ghost)} title="??????">
+                <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-11 items-center justify-center rounded-full border transition-all', ui.ghost)} title="添加附件">
                   <Paperclip className="h-5 w-5" />
                 </button>
-                <button type="button" onClick={toggleVoice} className={cx('flex h-11 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="??????">
+                <button type="button" onClick={toggleVoice} className={cx('flex h-11 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="语音识别">
                   <Mic className="h-5 w-5" />
                 </button>
                 {generating ? (
@@ -1139,10 +1209,10 @@ function AIWorkspace({
                   }}
                 />
                 <div className={cx('flex items-center gap-3 text-sm font-bold', ui.muted)}>
-                  <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)} title="??????">
+                  <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)} title="添加附件">
                     <Paperclip className="h-5 w-5" />
                   </button>
-                  <button type="button" onClick={toggleVoice} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="??????">
+                  <button type="button" onClick={toggleVoice} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="语音识别">
                     <Mic className="h-5 w-5" />
                   </button>
                   <span className="truncate text-[12px]">最多 3 个附件，当前为文件名随消息保存</span>
@@ -1590,6 +1660,7 @@ function AppShell() {
   const [module, setModule] = useState<ModuleKey>('groupbuy');
   const [search, setSearch] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [newConversationNonce, setNewConversationNonce] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
   const [profile, setProfile] = useState<StoreProfile>(() => readStorage('fitness_profile', defaultProfile));
   const [docs, setDocs] = useState<KnowledgeDoc[]>(() =>
@@ -1705,6 +1776,7 @@ function AppShell() {
           module={module}
           setModule={setModule}
           selectedConversationId={selectedConversationId}
+          newConversationNonce={newConversationNonce}
           user={user}
           setView={setView}
           onOpenAccount={() => setAccountOpen(true)}
@@ -1727,6 +1799,13 @@ function AppShell() {
         setView={setView}
         module={module}
         setModule={setModule}
+        conversations={conversations}
+        onOpenConversation={openConversation}
+        onNewConversation={() => {
+          setSelectedConversationId('');
+          setView('ai');
+          setNewConversationNonce((current) => current + 1);
+        }}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
         ui={ui}
