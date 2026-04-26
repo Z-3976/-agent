@@ -1082,8 +1082,7 @@ function AIWorkspace({
                   <span className={cx('rounded-full px-3 py-1 text-xs font-black', ui.soft)}>{modules[item.module].label}</span>
                   <span className={cx('text-xs font-bold', ui.muted)}>{item.updatedAt}</span>
                 </div>
-                <div className={cx('truncate text-base font-black', ui.strong)}>{item.title}</div>
-                <div className={cx('mt-2 line-clamp-2 text-sm leading-6', ui.muted)}>{item.messages.at(-1)?.content || '还没有消息'}</div>
+                <div className={cx('truncate text-base font-black', ui.strong)}>{item.title}</div>
               </button>
             ))
           )}
