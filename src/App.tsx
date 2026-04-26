@@ -957,13 +957,13 @@ function AIWorkspace({
 
       <main className="relative flex min-h-0 min-w-0 flex-col">
         <div className={cx('border-b px-6 py-5', ui.surface)}>
-          <div className="mx-auto flex w-full max-w-5xl flex-wrap items-start justify-between gap-4">
+          <div className="mx-auto flex w-full max-w-[980px] flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white">
                   {modules[module].icon}
                 </div>
-                <div className="max-w-[320px]">
+                <div className="max-w-[260px]">
                   <h1 className={cx('text-xl font-black', ui.strong)}>{modules[module].title}</h1>
                   <p className={cx('mt-1 text-[13px]', ui.muted)}>{modules[module].desc}</p>
                 </div>
@@ -1019,7 +1019,7 @@ function AIWorkspace({
         </div>
 
         <form onSubmit={send} className={cx('sticky bottom-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6', ui.surface)}>
-          <div className={cx('mx-auto max-w-5xl rounded-[28px] border px-4 py-3 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
+          <div className={cx('mx-auto w-full max-w-[720px] rounded-[28px] border px-4 py-3 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
             {attachments.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-2">
                 {attachments.map((file) => (
