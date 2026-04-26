@@ -17,10 +17,12 @@ import {
   Lock,
   LogOut,
   Mail,
+  Menu,
   MessageSquare,
   Mic,
   Monitor,
   Moon,
+  MoreHorizontal,
   Package,
   Paperclip,
   PauseCircle,
@@ -430,6 +432,8 @@ function TopBar({
   ui: ReturnType<typeof useThemeTokens>;
 }) {
   const [themeOpen, setThemeOpen] = useState(false);
+  const [mobileModuleOpen, setMobileModuleOpen] = useState(false);
+  const [mobileHeaderOpen, setMobileHeaderOpen] = useState(false);
   const themeLabel = themeMode === 'light' ? '浅色模式' : themeMode === 'dark' ? '深色模式' : '跟随系统';
 
   const themeOptions: Array<{ key: ThemeMode; label: string; icon: React.ReactNode }> = [
@@ -439,8 +443,8 @@ function TopBar({
   ];
 
   return (
-    <header className={cx('sticky top-0 z-40 border-b px-5 py-4 backdrop-blur-xl', ui.surface)}>
-      <div className="flex items-center gap-4">
+    <header className={cx('sticky top-0 z-40 border-b px-4 py-3 backdrop-blur-xl md:px-5 md:py-4', ui.surface)}>
+      <div className="hidden items-center gap-4 md:flex">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
             <Dumbbell className="h-7 w-7" />
@@ -451,7 +455,7 @@ function TopBar({
           </div>
         </div>
         {role === 'user' ? (
-          <div className="mx-auto hidden w-full max-w-[500px] md:block">
+          <div className="mx-auto w-full max-w-[500px]">
             <div className="grid grid-cols-4 gap-3">
               {(Object.keys(modules) as ModuleKey[]).map((key) => (
                 <div key={key} className="group relative">
@@ -476,7 +480,7 @@ function TopBar({
           </div>
         ) : <div className="mx-auto" />}
         <div className="ml-auto flex items-center gap-2">
-          <button className={cx('flex h-12 w-12 items-center justify-center rounded-full border transition-all', ui.ghost)} title="提醒">
+          <button className={cx('flex h-12 w-12 items-center justify-center rounded-full border transition-all', ui.ghost)} title="???">
             <Bell className="h-5 w-5" />
           </button>
           <div className="relative">
@@ -507,32 +511,100 @@ function TopBar({
           </div>
           <button onClick={onLogout} className={cx('flex h-12 items-center gap-2 rounded-full border px-4 text-sm font-black transition-all', ui.ghost)}>
             <LogOut className="h-4 w-4" />
-            退出
+            ????
           </button>
         </div>
       </div>
-      {role === 'user' ? (
-        <div className="mt-4 md:hidden">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {(Object.keys(modules) as ModuleKey[]).map((key) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setModule(key);
-                  setView('ai');
-                }}
-                title={modules[key].desc}
-                className={cx(
-                  'rounded-full border px-0 py-2.5 text-center text-[13px] font-black transition-all',
-                  view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
-                )}
-              >
-                {modules[key].label}
-              </button>
-            ))}
-          </div>
+
+      <div className="md:hidden">
+        <div className="flex items-center justify-between gap-3">
+          {role === 'user' ? (
+            <button onClick={() => setMobileModuleOpen((current) => !current)} className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all', ui.ghost)}>
+              <Menu className="h-5 w-5" />
+            </button>
+          ) : (
+            <div className="h-11 w-11 shrink-0" />
+          )}
+          <button onClick={() => setMobileHeaderOpen((current) => !current)} className="min-w-0 flex-1 text-center">
+            <div className={cx('truncate text-[18px] font-black', ui.strong)}>AI健身房运营助手</div>
+            <div className={cx('truncate text-[11px] font-bold', ui.muted)}>{role === 'staff' ? '工作者端' : '用户端'}</div>
+          </button>
+          <button onClick={() => setMobileHeaderOpen((current) => !current)} className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all', ui.ghost)}>
+            <MoreHorizontal className="h-5 w-5" />
+          </button>
         </div>
-      ) : null}
+
+        {mobileHeaderOpen ? (
+          <div className={cx('mt-3 rounded-[24px] border p-3 shadow-sm', ui.surface)}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
+                <Dumbbell className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <div className={cx('truncate text-[15px] font-black', ui.strong)}>AI健身房运营助手</div>
+                <div className={cx('truncate text-[11px] font-bold', ui.muted)}>{role === 'staff' ? '工作者后台 · 运营管理端' : '用户后台 · 门店使用端'}</div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button className={cx('flex h-11 items-center justify-center rounded-full border transition-all', ui.ghost)}>
+                <Bell className="h-5 w-5" />
+              </button>
+              <button onClick={() => setThemeOpen((current) => !current)} className={cx('flex h-11 items-center justify-center gap-2 rounded-full border transition-all', ui.ghost)}>
+                {themeMode === 'dark' ? <Moon className="h-5 w-5" /> : themeMode === 'system' ? <Monitor className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              <button onClick={onLogout} className={cx('flex h-11 items-center justify-center gap-2 rounded-full border text-sm font-black transition-all', ui.ghost)}>
+                <LogOut className="h-4 w-4" />
+                ????
+              </button>
+            </div>
+            {themeOpen ? (
+              <div className={cx('mt-3 rounded-[20px] border p-2', ui.surfaceAlt)}>
+                {themeOptions.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => {
+                      setThemeMode(option.key);
+                      setThemeOpen(false);
+                    }}
+                    className={cx('flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-bold transition-all', themeMode === option.key ? 'bg-indigo-50 text-indigo-600' : ui.nav)}
+                  >
+                    <span className="flex items-center gap-3">
+                      {option.icon}
+                      {option.label}
+                    </span>
+                    {themeMode === option.key ? <CheckCircle2 className="h-4 w-4" /> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {role === 'user' && mobileModuleOpen ? (
+          <div className={cx('mt-3 rounded-[24px] border p-3 shadow-sm', ui.surface)}>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(modules) as ModuleKey[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setModule(key);
+                    setView('ai');
+                    setMobileModuleOpen(false);
+                  }}
+                  title={modules[key].desc}
+                  className={cx(
+                    'rounded-full border px-0 py-2.5 text-center text-[13px] font-black transition-all',
+                    view === 'ai' && module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+                  )}
+                >
+                  {modules[key].label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </header>
   );
 }
@@ -897,8 +969,8 @@ function AIWorkspace({
   }
 
   return (
-    <div className="grid h-[calc(100vh-96px)] grid-cols-1 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className={cx('hidden h-full border-r xl:grid xl:grid-rows-[auto_minmax(0,1fr)_auto]', ui.surface)}>
+    <div className="grid h-[calc(100dvh-80px)] min-h-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-88px)] xl:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className={cx('hidden h-full min-h-0 overflow-hidden border-r xl:grid xl:grid-rows-[auto_minmax(0,1fr)_auto]', ui.surface)}>
         <div className="space-y-1.5 px-3 pt-4 pb-2">
           {navItems.map((item) => (
             <button
@@ -917,7 +989,7 @@ function AIWorkspace({
               <Plus className="h-4 w-4" />
               新建对话
             </button>
-            <div className="app-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="app-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
           {visibleConversations.length === 0 ? (
                 <div className={cx('rounded-[24px] border border-dashed p-5 text-sm', ui.muted)}>还没有历史对话。</div>
           ) : (
@@ -942,7 +1014,7 @@ function AIWorkspace({
             </div>
           </div>
         </div>
-        <div className="p-3 pt-0">
+        <div className="shrink-0 p-3 pt-0">
           <button onClick={onOpenAccount} className={cx('flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 transition-all', ui.ghost)}>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white">
               {(user.name || user.account).slice(0, 1).toUpperCase()}
@@ -956,7 +1028,7 @@ function AIWorkspace({
       </aside>
 
       <main className="relative flex min-h-0 min-w-0 flex-col">
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-44 md:px-6 md:py-5">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-36 md:px-6 md:py-5 md:pb-40">
           <div className="mx-auto max-w-5xl space-y-4">
             {messages.length === 0 ? (
               <div className="pt-2">
@@ -1002,12 +1074,12 @@ function AIWorkspace({
           </div>
         </div>
 
-        <form onSubmit={send} className={cx('sticky bottom-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6', ui.surface)}>
-          <div className="mx-auto flex w-full max-w-[720px] flex-col gap-3">
+        <form onSubmit={send} className="sticky bottom-0 z-30 px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 md:px-6 md:pb-5">
+          <div className="mx-auto w-full max-w-[420px] sm:max-w-[560px] md:max-w-[720px]">
             {attachments.length > 0 ? (
-              <div className="mb-3 flex flex-wrap gap-2">
+              <div className="mb-2 flex flex-wrap gap-2">
                 {attachments.map((file) => (
-                  <span key={file} className={cx('inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold', ui.soft)}>
+                  <span key={file} className={cx('inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold shadow-sm', ui.soft)}>
                     <Paperclip className="h-4 w-4" />
                     {file}
                     <button type="button" onClick={() => setAttachments((current) => current.filter((item) => item !== file))}>
@@ -1017,20 +1089,40 @@ function AIWorkspace({
                 ))}
               </div>
             ) : null}
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  send();
-                }
-              }}
-              className={cx('h-20 w-full resize-none rounded-[20px] border px-4 py-3 text-[13px] leading-6 outline-none transition-all shadow-[0_14px_34px_rgba(15,23,42,0.08)]', ui.input)}
+
+            <div className={cx('rounded-[28px] border bg-white/92 p-3 shadow-[0_18px_42px_rgba(15,23,42,0.10)] backdrop-blur-xl', ui.surface)}>
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    send();
+                  }
+                }}
+                className={cx('h-14 sm:h-16 w-full resize-none rounded-[22px] border-0 bg-transparent px-3 py-3 text-[13px] leading-6 outline-none transition-all shadow-none', ui.input)}
               placeholder="描述你的问题，例如：帮我做一个适合写字楼人群的 9.9 元团购套餐……"
-            />
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div className={cx('flex items-center gap-3 text-sm font-bold', ui.muted)}>
+              />
+
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:hidden">
+                <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-11 items-center justify-center rounded-full border transition-all', ui.ghost)} title="??????">
+                  <Paperclip className="h-5 w-5" />
+                </button>
+                <button type="button" onClick={toggleVoice} className={cx('flex h-11 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="??????">
+                  <Mic className="h-5 w-5" />
+                </button>
+                {generating ? (
+                  <button type="button" onClick={stop} className="flex h-11 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white">
+                    <PauseCircle className="h-5 w-5" />
+                  </button>
+                ) : (
+                  <button disabled={!input.trim()} className="flex h-11 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white disabled:bg-zinc-300">
+                    <Send className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-3 hidden items-center justify-between gap-3 sm:flex">
                 <input
                   ref={fileRef}
                   type="file"
@@ -1046,25 +1138,28 @@ function AIWorkspace({
                     setAttachments(names);
                   }}
                 />
-                <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)} title="添加附件">
-                  <Paperclip className="h-5 w-5" />
-                </button>
-                <button type="button" onClick={toggleVoice} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="语音识别">
-                  <Mic className="h-5 w-5" />
-                </button>
-                <span>最多 3 个附件，当前为文件名随消息保存</span>
+                <div className={cx('flex items-center gap-3 text-sm font-bold', ui.muted)}>
+                  <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)} title="??????">
+                    <Paperclip className="h-5 w-5" />
+                  </button>
+                  <button type="button" onClick={toggleVoice} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', listening ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)} title="??????">
+                    <Mic className="h-5 w-5" />
+                  </button>
+                  <span className="truncate text-[12px]">最多 3 个附件，当前为文件名随消息保存</span>
+                </div>
+                {generating ? (
+                  <button type="button" onClick={stop} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white">
+                    <PauseCircle className="h-5 w-5" />
+                    停止
+                  </button>
+                ) : (
+                  <button disabled={!input.trim()} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white disabled:bg-zinc-300">
+                    <Send className="h-5 w-5" />
+                    发送
+                  </button>
+                )}
               </div>
-              {generating ? (
-                <button type="button" onClick={stop} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white">
-                  <PauseCircle className="h-5 w-5" />
-                  停止
-                </button>
-              ) : (
-                <button disabled={!input.trim()} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white disabled:bg-zinc-300">
-                  <Send className="h-5 w-5" />
-                  发送
-                </button>
-              )}
+
             </div>
           </div>
         </form>
@@ -1624,7 +1719,7 @@ function AppShell() {
   })();
 
   return (
-    <div className={cx('min-h-screen', ui.page)}>
+    <div className={cx('min-h-screen overflow-x-hidden', ui.page)}>
       <TopBar
         role={effectiveRole}
         onLogout={logout}
@@ -1636,7 +1731,7 @@ function AppShell() {
         setThemeMode={setThemeMode}
         ui={ui}
       />
-      <div className="flex">
+      <div className="flex min-h-0">
         <Sidebar role={effectiveRole} user={user} view={view} setView={setView} onOpenAccount={() => setAccountOpen(true)} ui={ui} />
         <main className="min-w-0 flex-1">{content}</main>
       </div>
