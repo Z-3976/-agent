@@ -106,12 +106,14 @@ type AdminUserAccount = {
 type SpeechRecognitionCtor = new () => {
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives?: number;
   lang: string;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
 };
 
 const modules: Record<ModuleKey, { label: string; title: string; desc: string; icon: React.ReactNode }> = {
@@ -442,6 +444,7 @@ function TopBar({
   const [themeOpen, setThemeOpen] = useState(false);
   const [mobileModuleOpen, setMobileModuleOpen] = useState(false);
   const [mobileHeaderOpen, setMobileHeaderOpen] = useState(false);
+  const mobileBarRef = useRef<HTMLElement | null>(null);
   const themeLabel = themeMode === 'light' ? '浅色模式' : themeMode === 'dark' ? '深色模式' : '跟随系统';
 
   const themeOptions: Array<{ key: ThemeMode; label: string; icon: React.ReactNode }> = [
@@ -451,8 +454,23 @@ function TopBar({
   ];
   const recentConversations = conversations.slice(0, 5);
 
+  useEffect(() => {
+    if (!mobileModuleOpen && !mobileHeaderOpen && !themeOpen) return;
+
+    function closeMobileMenus(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target && mobileBarRef.current?.contains(target)) return;
+      setMobileModuleOpen(false);
+      setMobileHeaderOpen(false);
+      setThemeOpen(false);
+    }
+
+    document.addEventListener('pointerdown', closeMobileMenus);
+    return () => document.removeEventListener('pointerdown', closeMobileMenus);
+  }, [mobileModuleOpen, mobileHeaderOpen, themeOpen]);
+
   return (
-    <header className={cx('sticky top-0 z-40 border-b px-4 py-3 backdrop-blur-xl md:px-5 md:py-4', ui.surface)}>
+    <header ref={mobileBarRef} className={cx('sticky top-0 z-40 border-b px-4 py-3 backdrop-blur-xl md:px-5 md:py-4', ui.surface)}>
       <div className="hidden items-center gap-4 md:flex">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
@@ -576,22 +594,12 @@ function TopBar({
         {role === 'user' ? (
           <div
             className={cx(
-              'overflow-hidden transition-all duration-300 ease-out',
-              mobileModuleOpen ? 'mt-3 max-h-[520px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none',
+              'overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+              mobileModuleOpen ? 'mt-3 max-h-[520px] opacity-100 translate-y-0 scale-100' : 'max-h-0 opacity-0 -translate-y-1 scale-[0.98] pointer-events-none',
             )}
           >
             <div className={cx('rounded-[24px] border p-3 shadow-sm', ui.surface)}>
-              <button
-                onClick={() => {
-                  onNewConversation();
-                  setMobileModuleOpen(false);
-                }}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 text-sm font-black text-white"
-              >
-                <Plus className="h-4 w-4" />
-                新建对话
-              </button>
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(modules) as ModuleKey[]).map((key) => (
                   <button
                     key={key}
@@ -611,6 +619,16 @@ function TopBar({
                 ))}
               </div>
               <div className="mt-4 border-t pt-3">
+                <button
+                  onClick={() => {
+                    onNewConversation();
+                    setMobileModuleOpen(false);
+                  }}
+                  className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 text-sm font-black text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  新建对话
+                </button>
                 <div className={cx('mb-2 text-[12px] font-bold uppercase tracking-[0.18em]', ui.muted)}>最近对话</div>
                 <div className="space-y-2">
                   {recentConversations.length === 0 ? (
@@ -641,8 +659,8 @@ function TopBar({
 
         <div
           className={cx(
-            'overflow-hidden transition-all duration-300 ease-out',
-            mobileHeaderOpen ? 'mt-3 max-h-[420px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-2 pointer-events-none',
+            'overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+            mobileHeaderOpen ? 'mt-3 max-h-[420px] opacity-100 translate-y-0 scale-100' : 'max-h-0 opacity-0 -translate-y-1 scale-[0.98] pointer-events-none',
           )}
         >
           <div className={cx('rounded-[24px] border p-3 shadow-sm', ui.surface)}>
@@ -674,8 +692,8 @@ function TopBar({
             </div>
             <div
               className={cx(
-                'overflow-hidden transition-all duration-300 ease-out',
-                themeOpen ? 'mt-3 max-h-64 opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
+                'overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
+                themeOpen ? 'mt-3 max-h-64 opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none',
               )}
             >
               <div className={cx('rounded-[20px] border p-2', ui.surfaceAlt)}>
@@ -890,6 +908,7 @@ function AIWorkspace({
   const mountedRef = useRef(false);
   const active = conversations.find((item) => item.id === activeId);
   const messages = active?.messages ?? [];
+  const messageContentKey = messages.map((message) => `${message.id}:${message.content.length}`).join('|');
   const activeDocs = docs.filter((doc) => doc.active && doc.module === module);
   const visibleConversations = conversations;
   const navItems = [
@@ -918,7 +937,7 @@ function AIWorkspace({
       behavior: messages.length > 1 ? 'smooth' : 'auto',
       block: 'end',
     });
-  }, [messages.length, generating, activeId]);
+  }, [messages.length, messageContentKey, generating, activeId]);
 
   function newConversation(nextModule = module) {
     setActiveId('');
@@ -931,6 +950,48 @@ function AIWorkspace({
     abortRef.current?.abort();
     abortRef.current = null;
     setGenerating(false);
+  }
+
+  function cleanAiOutput(content: string) {
+    return content
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\s+([，。！？、；：,.!?;:])/g, '$1')
+      .replace(/([，。！？、；：,.!?;:]){2,}/g, '$1')
+      .trim();
+  }
+
+  function setAssistantContent(conversationId: string, assistantId: string, content: string) {
+    setConversations((current) =>
+      current.map((item) =>
+        item.id === conversationId
+          ? {
+              ...item,
+              messages: item.messages.map((message) => (message.id === assistantId ? { ...message, content } : message)),
+            }
+          : item,
+      ),
+    );
+  }
+
+  async function typeAssistantContent(conversationId: string, assistantId: string, content: string, signal: AbortSignal) {
+    const text = cleanAiOutput(content);
+    if (!text) {
+      setAssistantContent(conversationId, assistantId, '');
+      return;
+    }
+
+    const chunkSize = text.length > 600 ? 5 : text.length > 260 ? 3 : 2;
+    let index = 0;
+
+    while (index < text.length) {
+      if (signal.aborted) return;
+      index = Math.min(text.length, index + chunkSize);
+      setAssistantContent(conversationId, assistantId, text.slice(0, index));
+      await new Promise((resolve) => window.setTimeout(resolve, 18));
+    }
   }
 
   function toggleVoice() {
@@ -953,7 +1014,8 @@ function AIWorkspace({
     const recognition = new Ctor();
     speechRef.current = recognition;
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
     recognition.lang = 'zh-CN';
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results)
@@ -962,17 +1024,28 @@ function AIWorkspace({
         .trim();
 
       if (!transcript) return;
-      setInput((current) => (current ? `${current} ${transcript}` : transcript));
+      setInput((current) => (current ? `${current}${transcript}` : transcript));
     };
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       setListening(false);
+      speechRef.current = null;
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        window.alert('请允许浏览器使用麦克风后再试。');
+      }
     };
     recognition.onend = () => {
       setListening(false);
       speechRef.current = null;
     };
-    setListening(true);
-    recognition.start();
+
+    try {
+      setListening(true);
+      recognition.start();
+    } catch {
+      setListening(false);
+      speechRef.current = null;
+      window.alert('语音识别启动失败，请检查浏览器麦克风权限。');
+    }
   }
 
   async function send(event?: FormEvent) {
@@ -1033,23 +1106,14 @@ function AIWorkspace({
 
     try {
       const result = await apiRequestWithSignal<{ content: string }>('/agent/chat-v2', {
-        question: `${question}\n\n补充要求：必须结合门店资料回答；只说确定的信息；输出简短、干练、可执行；优先用 3 到 5 条短句，不要空话，不要幻想。`,
+        question: `${question}\n\n补充要求：必须结合门店资料回答；只说确定的信息；输出简短、干练、可执行；优先用 3 到 5 条短句，不要空话，不要幻想。不要使用 Markdown 大标题，不要多余空行，不要连续标点。`,
         module,
         profile,
         docs: activeDocs,
         messages: messages.slice(-8),
       }, controller.signal);
 
-      setConversations((current) =>
-        current.map((item) =>
-          item.id === conversationId
-            ? {
-                ...item,
-                messages: item.messages.map((message) => (message.id === assistantId ? { ...message, content: result.content } : message)),
-              }
-            : item,
-        ),
-      );
+      await typeAssistantContent(conversationId, assistantId, result.content, controller.signal);
     } catch (err) {
       const content =
         err instanceof DOMException && err.name === 'AbortError'
@@ -1058,16 +1122,11 @@ function AIWorkspace({
             ? `AI 接口调用失败：${err.message}`
             : 'AI 接口调用失败，请检查后端配置。';
 
-      setConversations((current) =>
-        current.map((item) =>
-          item.id === conversationId
-            ? {
-                ...item,
-                messages: item.messages.map((message) => (message.id === assistantId ? { ...message, content } : message)),
-              }
-            : item,
-        ),
-      );
+      if (controller.signal.aborted) {
+        setAssistantContent(conversationId, assistantId, cleanAiOutput(content));
+      } else {
+        await typeAssistantContent(conversationId, assistantId, content, controller.signal);
+      }
     } finally {
       abortRef.current = null;
       setGenerating(false);
@@ -1133,8 +1192,8 @@ function AIWorkspace({
       </aside>
 
       <main className="relative flex min-h-0 min-w-0 flex-col">
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-36 md:px-6 md:py-5 md:pb-40">
-          <div className="mx-auto max-w-5xl space-y-4">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-4 md:px-6 md:py-5 md:pb-6">
+          <div className={cx('mx-auto max-w-5xl space-y-3', messages.length > 0 && 'flex min-h-full flex-col justify-end')}>
             {messages.length === 0 ? (
               <div className="pt-2">
                 <div className="grid gap-3 md:grid-cols-2">
@@ -1179,7 +1238,7 @@ function AIWorkspace({
           </div>
         </div>
 
-        <form onSubmit={send} className="sticky bottom-0 z-30 px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 md:px-6 md:pb-5">
+        <form onSubmit={send} className="sticky bottom-0 z-30 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2 md:px-6 md:pb-4">
           <div className="mx-auto w-full max-w-[420px] sm:max-w-[560px] md:max-w-[720px]">
             {attachments.length > 0 ? (
               <div className="mb-2 flex flex-wrap gap-2">
