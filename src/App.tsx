@@ -1,9 +1,11 @@
-import React, { FormEvent, useEffect, useRef, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
+  Bell,
   Bot,
   Building2,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Copy,
   Database,
@@ -12,18 +14,25 @@ import {
   History,
   LayoutDashboard,
   Loader2,
+  Lock,
   LogOut,
+  Mail,
   MessageSquare,
+  Monitor,
+  Moon,
   Package,
   Paperclip,
   PauseCircle,
+  PencilLine,
   Plus,
   Radio,
   RefreshCw,
   Search,
   Send,
+  Settings2,
   ShieldCheck,
   Sparkles,
+  Sun,
   Target,
   Upload,
   UserRound,
@@ -33,9 +42,10 @@ import {
 } from 'lucide-react';
 
 type AppRole = 'user' | 'staff';
-type View = 'home' | 'agent' | 'history' | 'profile' | 'staffHome' | 'knowledge' | 'records';
+type View = 'home' | 'ai' | 'history' | 'profile' | 'staffHome' | 'knowledge' | 'records';
 type ModuleKey = 'groupbuy' | 'video' | 'live' | 'product';
 type MessageRole = 'user' | 'assistant';
+type ThemeMode = 'light' | 'dark' | 'system';
 
 type StoreProfile = {
   name: string;
@@ -78,33 +88,34 @@ type AuthUser = {
   role: AppRole;
   account: string;
   name: string;
+  accountType?: 'phone' | 'email';
+  createdAt?: string;
 };
 
-
-const modules: Record<ModuleKey, { label: string; title: string; icon: React.ReactNode; desc: string }> = {
+const modules: Record<ModuleKey, { label: string; title: string; desc: string; icon: React.ReactNode }> = {
   groupbuy: {
     label: '团购',
-    title: '团购运营 Agent',
-    icon: <Target className="h-5 w-5" />,
+    title: '团购运营 AI',
     desc: '门店诊断、套餐设计、上架表达和私域承接。',
+    icon: <Target className="h-5 w-5" />,
   },
   video: {
     label: '短视频',
-    title: '短视频内容 Agent',
-    icon: <Video className="h-5 w-5" />,
+    title: '短视频内容 AI',
     desc: '输出选题、脚本、标题、封面文案和发布节奏。',
+    icon: <Video className="h-5 w-5" />,
   },
   live: {
     label: '直播',
-    title: '直播转化 Agent',
-    icon: <Radio className="h-5 w-5" />,
+    title: '直播转化 AI',
     desc: '设计留人、互动、福利节奏和成交话术。',
+    icon: <Radio className="h-5 w-5" />,
   },
   product: {
     label: '包装',
-    title: '产品包装 Agent',
+    title: '产品包装 AI',
+    desc: '优化商品标题、卖点、头图文案和详情结构。',
     icon: <Package className="h-5 w-5" />,
-    desc: '优化商品标题、核心卖点、头图文案和详情页结构。',
   },
 };
 
@@ -119,11 +130,15 @@ const defaultProfile: StoreProfile = {
 };
 
 const starterPrompts: Record<ModuleKey, string[]> = {
-  groupbuy: ['帮我做一个适合写字楼人群的 9.9 元团购套餐', '我的团购浏览多转化少，帮我诊断', '设计团购购买后的私域承接 SOP'],
+  groupbuy: ['帮我做一个适合写字楼人群的 9.9 元团购套餐', '我的团购浏览多但转化少，帮我诊断', '设计团购购买后的私域承接 SOP'],
   video: ['给我写一个短视频脚本', '生成 7 天短视频选题', '把门店案例改成抖音脚本'],
   live: ['设计一场 60 分钟直播流程', '写直播开场 3 分钟留人话术', '用户说没时间训练怎么成交'],
   product: ['包装一个 21 天减脂挑战营', '给私教体验课写 10 个标题', '优化课程卖点适合团购平台'],
 };
+
+function cx(...values: Array<string | false | null | undefined>) {
+  return values.filter(Boolean).join(' ');
+}
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -158,8 +173,60 @@ function resetAppStorage() {
   localStorage.removeItem('fitness_user_staff');
 }
 
-function moduleClasses(active: boolean) {
-  return active ? 'border-zinc-950 bg-zinc-950 text-white' : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-950 hover:text-zinc-950';
+function getResolvedTheme(mode: ThemeMode, systemDark: boolean) {
+  return mode === 'system' ? (systemDark ? 'dark' : 'light') : mode;
+}
+
+function useSystemDark() {
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (event: MediaQueryListEvent) => setSystemDark(event.matches);
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
+  }, []);
+
+  return systemDark;
+}
+
+function useClickGlow() {
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      const spark = document.createElement('span');
+      spark.className = 'click-spark';
+      spark.style.left = `${event.clientX}px`;
+      spark.style.top = `${event.clientY}px`;
+      document.body.appendChild(spark);
+      window.setTimeout(() => spark.remove(), 450);
+    }
+
+    window.addEventListener('click', handleClick, true);
+    return () => window.removeEventListener('click', handleClick, true);
+  }, []);
+}
+
+function useThemeTokens(isDark: boolean) {
+  return useMemo(
+    () => ({
+      page: isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-[#f5f7fb] text-zinc-950',
+      surface: isDark ? 'border-zinc-800 bg-zinc-900 text-zinc-100' : 'border-zinc-200 bg-white text-zinc-950',
+      surfaceAlt: isDark ? 'border-zinc-800 bg-zinc-950/60' : 'border-zinc-200 bg-[#f8fafc]',
+      muted: isDark ? 'text-zinc-400' : 'text-zinc-500',
+      strong: isDark ? 'text-zinc-50' : 'text-zinc-950',
+      soft: isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-500',
+      input: isDark
+        ? 'border-zinc-800 bg-zinc-950 text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600'
+        : 'border-zinc-200 bg-[#eef3fb] text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-950',
+      accent: 'bg-zinc-950 text-white',
+      ghost: isDark ? 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-800' : 'border-zinc-200 text-zinc-600 hover:border-zinc-950 hover:bg-white hover:text-zinc-950',
+      nav: isDark ? 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100' : 'text-zinc-500 hover:bg-white hover:text-zinc-950',
+      navActive: isDark ? 'bg-white text-zinc-950' : 'bg-zinc-950 text-white',
+      bubbleUser: 'border-zinc-950 bg-zinc-950 text-white',
+      bubbleAi: isDark ? 'border-zinc-800 bg-zinc-900 text-zinc-100' : 'border-zinc-200 bg-white text-zinc-800',
+    }),
+    [isDark],
+  );
 }
 
 async function apiRequest<T>(path: string, body?: unknown): Promise<T> {
@@ -187,7 +254,15 @@ async function apiRequestWithSignal<T>(path: string, body: unknown, signal: Abor
   return data as T;
 }
 
-function AuthPage({ role, onAuthed }: { role: AppRole; onAuthed: (user: AuthUser) => void }) {
+function AuthPage({
+  role,
+  onAuthed,
+  ui,
+}: {
+  role: AppRole;
+  onAuthed: (user: AuthUser) => void;
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [account, setAccount] = useState('');
   const [name, setName] = useState('');
@@ -226,75 +301,83 @@ function AuthPage({ role, onAuthed }: { role: AppRole; onAuthed: (user: AuthUser
   }
 
   return (
-    <div className="min-h-screen bg-zinc-100 p-6">
-      <div className="mx-auto grid min-h-[calc(100vh-48px)] max-w-6xl overflow-hidden rounded-xl border border-zinc-200 bg-white lg:grid-cols-[1fr_440px]">
-        <section className="flex flex-col justify-between bg-zinc-950 p-8 text-white">
-          <div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-zinc-950">
-              <Dumbbell className="h-7 w-7" />
+    <div className={cx('min-h-screen p-6', ui.page)}>
+      <div className={cx('mx-auto grid min-h-[calc(100vh-48px)] max-w-7xl overflow-hidden rounded-[28px] border shadow-[0_24px_80px_rgba(15,23,42,0.08)] lg:grid-cols-[1.08fr_0.92fr]', ui.surface)}>
+        <section className="relative overflow-hidden bg-zinc-950 p-8 text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.22),transparent_34%)]" />
+          <div className="relative flex h-full flex-col justify-between">
+            <div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-zinc-950 shadow-sm">
+                <Dumbbell className="h-8 w-8" />
+              </div>
+              <div className="mt-8">
+                <div className="text-sm font-bold uppercase tracking-[0.24em] text-zinc-400">AI Fitness Ops</div>
+                <h1 className="mt-4 text-4xl font-black leading-tight">AI健身房运营助手</h1>
+                <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-300">
+                  把门店资料、知识库和 AI 对话连接起来，生成真正可落地的团购、短视频、直播和产品包装方案。
+                </p>
+              </div>
             </div>
-            <h1 className="mt-8 text-4xl font-black leading-tight">AI 健身房运营助手</h1>
-            <p className="mt-4 max-w-xl text-lg leading-8 text-zinc-300">把门店资料、知识库和 Agent 对话结合起来，生成真实可落地的团购、短视频、直播和产品包装方案。</p>
-          </div>
-          <div className="grid gap-3 text-sm text-zinc-300 md:grid-cols-3">
-            <div className="rounded-lg border border-white/10 p-4">
-              <ShieldCheck className="mb-3 h-5 w-5" />
-              密码注册与登录
-            </div>
-            <div className="rounded-lg border border-white/10 p-4">
-              <Users className="mb-3 h-5 w-5" />
-              用户端与工作者端分离
-            </div>
-            <div className="rounded-lg border border-white/10 p-4">
-              <Sparkles className="mb-3 h-5 w-5" />
-              后端 Agent API 接入
+            <div className="grid gap-3 text-sm text-zinc-300 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <ShieldCheck className="mb-3 h-5 w-5" />
+                密码注册与登录
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <Users className="mb-3 h-5 w-5" />
+                用户端与工作者端分离
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <Sparkles className="mb-3 h-5 w-5" />
+                后端 AI 接口接入
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="flex items-center p-8">
+        <section className="flex items-center p-8 lg:p-10">
           <form onSubmit={submit} className="w-full">
             <div className="mb-8">
-              <div className="text-sm font-bold text-zinc-500">{role === 'staff' ? '工作者入口' : '用户门户'}</div>
-              <h2 className="mt-2 text-3xl font-black text-zinc-950">{roleTitle}</h2>
+              <div className={cx('text-sm font-bold', ui.muted)}>{role === 'staff' ? '工作者入口' : '用户门户'}</div>
+              <h2 className={cx('mt-2 text-3xl font-black', ui.strong)}>{roleTitle}</h2>
             </div>
-            <div className="mb-6 grid grid-cols-2 rounded-lg bg-zinc-100 p-1">
-              <button type="button" onClick={() => setMode('login')} className={`rounded-md py-3 text-sm font-black ${mode === 'login' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}>
+            <div className={cx('mb-6 grid grid-cols-2 rounded-2xl p-1', ui.surfaceAlt)}>
+              <button type="button" onClick={() => setMode('login')} className={cx('rounded-[14px] py-3 text-sm font-black transition-all', mode === 'login' ? 'bg-white text-zinc-950 shadow-sm' : ui.muted)}>
                 登录
               </button>
-              <button type="button" onClick={() => setMode('register')} className={`rounded-md py-3 text-sm font-black ${mode === 'register' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}>
+              <button type="button" onClick={() => setMode('register')} className={cx('rounded-[14px] py-3 text-sm font-black transition-all', mode === 'register' ? 'bg-white text-zinc-950 shadow-sm' : ui.muted)}>
                 注册
               </button>
             </div>
             <div className="space-y-4">
               {mode === 'register' && (
                 <label className="block">
-                  <span className="mb-2 block text-sm font-bold text-zinc-600">名称</span>
-                  <input value={name} onChange={(event) => setName(event.target.value)} className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder="门店名或姓名" />
+                  <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>名称</span>
+                  <input value={name} onChange={(event) => setName(event.target.value)} className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} placeholder="门店名或你的名称" />
                 </label>
               )}
               <label className="block">
-                <span className="mb-2 block text-sm font-bold text-zinc-600">手机号 / 邮箱</span>
-                <input value={account} onChange={(event) => setAccount(event.target.value)} className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder="手机号或邮箱" />
+                <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>手机号 / 邮箱</span>
+                <input value={account} onChange={(event) => setAccount(event.target.value)} className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} placeholder="手机号或邮箱" />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-bold text-zinc-600">密码</span>
-                <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder="至少 6 位，包含英文和数字" />
+                <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>密码</span>
+                <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} placeholder="至少 6 位，包含英文和数字" />
               </label>
               {mode === 'register' && (
                 <label className="block">
-                  <span className="mb-2 block text-sm font-bold text-zinc-600">再次输入密码</span>
-                  <input value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} type="password" className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder="确认密码" />
+                  <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>再次输入密码</span>
+                  <input value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} type="password" className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} placeholder="确认密码" />
                 </label>
               )}
             </div>
-            {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{error}</div>}
-            <button disabled={loading} className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-zinc-950 font-black text-white disabled:bg-zinc-400">
+            {error && <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{error}</div>}
+            <button disabled={loading} className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-950 font-black text-white disabled:bg-zinc-400">
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
               {mode === 'register' ? '注册并进入' : '登录'}
             </button>
             <div className="mt-5 flex justify-between text-sm">
-              <a className="font-bold text-zinc-500 hover:text-zinc-950" href={role === 'staff' ? '/user' : '/staff'}>
+              <a className={cx('font-bold transition-colors', ui.muted, 'hover:text-zinc-950')} href={role === 'staff' ? '/user' : '/staff'}>
                 切换到{role === 'staff' ? '用户端' : '工作者端'}
               </a>
             </div>
@@ -308,53 +391,125 @@ function AuthPage({ role, onAuthed }: { role: AppRole; onAuthed: (user: AuthUser
 function TopBar({
   role,
   user,
-  setView,
-  onLogout,
   search,
   setSearch,
+  onLogout,
+  onOpenAccount,
+  themeMode,
+  setThemeMode,
+  ui,
 }: {
   role: AppRole;
-  user: AuthUser | null;
-  setView: (view: View) => void;
-  onLogout: () => void;
+  user: AuthUser;
   search: string;
   setSearch: (value: string) => void;
+  onLogout: () => void;
+  onOpenAccount: () => void;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
+  ui: ReturnType<typeof useThemeTokens>;
 }) {
+  const [themeOpen, setThemeOpen] = useState(false);
+  const themeLabel = themeMode === 'light' ? '浅色模式' : themeMode === 'dark' ? '深色模式' : '跟随系统';
+
+  const themeOptions: Array<{ key: ThemeMode; label: string; icon: React.ReactNode }> = [
+    { key: 'light', label: '浅色模式', icon: <Sun className="h-5 w-5" /> },
+    { key: 'dark', label: '深色模式', icon: <Moon className="h-5 w-5" /> },
+    { key: 'system', label: '跟随系统', icon: <Monitor className="h-5 w-5" /> },
+  ];
+
   return (
-    <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-5">
-      <div className="flex min-w-[280px] items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-950 text-white">
-          <Dumbbell className="h-7 w-7" />
+    <header className={cx('sticky top-0 z-40 border-b px-5 py-4 backdrop-blur-xl', ui.surface)}>
+      <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
+            <Dumbbell className="h-7 w-7" />
+          </div>
+          <div className="min-w-0">
+            <div className={cx('truncate text-xl font-black', ui.strong)}>AI健身房运营助手</div>
+            <div className={cx('truncate text-xs font-bold', ui.muted)}>{role === 'staff' ? '工作者后台 · 运营管理端' : '用户后台 · 门店使用端'}</div>
+          </div>
         </div>
-        <div>
-          <div className="text-xl font-black text-zinc-950">{role === 'staff' ? '工作者后台' : '用户后台'}</div>
-          <div className="text-xs font-bold text-zinc-500">健身房运营助手 · {role === 'staff' ? '工作者端' : '门店使用端'}</div>
+        <label className="relative mx-auto hidden w-full max-w-[560px] md:block">
+          <Search className={cx('absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2', ui.muted)} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className={cx('h-14 w-full rounded-full border pl-14 pr-5 outline-none transition-all', ui.input)}
+            placeholder="搜索对话、历史记录或运营指令"
+          />
+        </label>
+        <div className="ml-auto flex items-center gap-2">
+          <button className={cx('flex h-12 w-12 items-center justify-center rounded-full border transition-all', ui.ghost)} title="提醒">
+            <Bell className="h-5 w-5" />
+          </button>
+          <div className="relative">
+            <button onClick={() => setThemeOpen((current) => !current)} className={cx('flex h-12 items-center gap-2 rounded-full border px-4 transition-all', ui.ghost)} title={themeLabel}>
+              {themeMode === 'dark' ? <Moon className="h-5 w-5" /> : themeMode === 'system' ? <Monitor className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {themeOpen && (
+              <div className={cx('absolute right-0 top-14 w-56 rounded-3xl border p-2 shadow-2xl', ui.surface)}>
+                {themeOptions.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => {
+                      setThemeMode(option.key);
+                      setThemeOpen(false);
+                    }}
+                    className={cx('flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-bold transition-all', themeMode === option.key ? 'bg-indigo-50 text-indigo-600' : ui.nav)}
+                  >
+                    <span className="flex items-center gap-3">
+                      {option.icon}
+                      {option.label}
+                    </span>
+                    {themeMode === option.key ? <CheckCircle2 className="h-4 w-4" /> : null}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={onLogout} className={cx('flex h-12 items-center gap-2 rounded-full border px-4 text-sm font-black transition-all', ui.ghost)}>
+            <LogOut className="h-4 w-4" />
+            退出
+          </button>
+          <button onClick={onOpenAccount} className={cx('flex h-12 items-center gap-3 rounded-full border px-3 pr-4 transition-all', ui.ghost)}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-950 text-sm font-black text-white">
+              {(user.name || user.account).slice(0, 1).toUpperCase()}
+            </div>
+            <div className="hidden text-left md:block">
+              <div className={cx('max-w-[110px] truncate text-sm font-black', ui.strong)}>{user.name || '未命名用户'}</div>
+              <div className={cx('max-w-[110px] truncate text-xs', ui.muted)}>{user.account}</div>
+            </div>
+          </button>
         </div>
       </div>
-      <label className="relative mx-6 hidden w-full max-w-[520px] md:block">
-        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
+      <label className="relative mt-4 block md:hidden">
+        <Search className={cx('absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2', ui.muted)} />
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="h-12 w-full rounded-lg border border-zinc-200 bg-zinc-50 pl-12 pr-4 outline-none focus:border-zinc-950 focus:bg-white"
-          placeholder="搜索对话、历史记录或运营指令"
+          className={cx('h-12 w-full rounded-full border pl-14 pr-5 outline-none transition-all', ui.input)}
+          placeholder="搜索工具、对话或指令"
         />
       </label>
-      <div className="flex items-center gap-2">
-        <button onClick={() => setView('agent')} className="hidden rounded-lg bg-zinc-950 px-5 py-3 text-sm font-black text-white md:inline-flex">
-          打开 Agent
-        </button>
-        <button onClick={onLogout} className="flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-3 text-sm font-black text-zinc-600 hover:border-zinc-950 hover:text-zinc-950">
-          <LogOut className="h-4 w-4" />
-          退出
-        </button>
-        <div className="hidden text-sm font-bold text-zinc-500 lg:block">{user?.name || user?.account}</div>
-      </div>
     </header>
   );
 }
 
-function Sidebar({ role, view, setView }: { role: AppRole; view: View; setView: (view: View) => void }) {
+function Sidebar({
+  role,
+  user,
+  view,
+  setView,
+  ui,
+}: {
+  role: AppRole;
+  user: AuthUser;
+  view: View;
+  setView: (view: View) => void;
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   const items =
     role === 'staff'
       ? [
@@ -364,26 +519,31 @@ function Sidebar({ role, view, setView }: { role: AppRole; view: View; setView: 
         ]
       : [
           { key: 'home' as View, label: '用户首页', icon: <LayoutDashboard className="h-5 w-5" /> },
-          { key: 'agent' as View, label: 'Agent 对话', icon: <Bot className="h-5 w-5" /> },
+          { key: 'ai' as View, label: 'AI 对话', icon: <Bot className="h-5 w-5" /> },
           { key: 'history' as View, label: '我的历史', icon: <History className="h-5 w-5" /> },
           { key: 'profile' as View, label: '门店资料', icon: <Building2 className="h-5 w-5" /> },
         ];
 
   return (
-    <aside className="flex h-[calc(100vh-64px)] w-[260px] shrink-0 flex-col border-r border-zinc-200 bg-white">
-      <div className="border-b border-zinc-200 p-4">
-        <div className="rounded-lg bg-zinc-50 p-5">
-          <div className="text-sm font-bold text-zinc-400">{role === 'staff' ? '运营工作台' : '用户门户'}</div>
-          <div className="mt-2 text-2xl font-black text-zinc-950">{role === 'staff' ? '工作者后台' : '用户后台'}</div>
-          <p className="mt-3 text-sm leading-6 text-zinc-500">{role === 'staff' ? '管理知识库、查看账号与对话记录。' : '使用 Agent 生成方案并管理门店资料。'}</p>
+    <aside className={cx('hidden h-[calc(100vh-96px)] w-[276px] shrink-0 border-r xl:flex xl:flex-col', ui.surface)}>
+      <div className="p-4">
+        <div className={cx('rounded-[24px] border p-5 shadow-sm', ui.surfaceAlt)}>
+          <div className={cx('text-xs font-bold uppercase tracking-[0.22em]', ui.muted)}>{role === 'staff' ? 'Operations' : 'Workspace'}</div>
+          <div className={cx('mt-3 text-2xl font-black', ui.strong)}>{role === 'staff' ? '工作者后台' : '用户后台'}</div>
+          <p className={cx('mt-3 text-sm leading-6', ui.muted)}>
+            {role === 'staff' ? '管理真实账号、知识库与对话记录。' : '用 AI 生成方案，管理门店资料和历史对话。'}
+          </p>
+          <div className={cx('mt-5 rounded-2xl px-4 py-3 text-sm font-bold', ui.soft)}>
+            当前账号：{user.name || user.account}
+          </div>
         </div>
       </div>
-      <nav className="space-y-2 p-3">
+      <nav className="space-y-2 px-3 pb-4">
         {items.map((item) => (
           <button
             key={item.key}
             onClick={() => setView(item.key)}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-4 text-left font-black ${view === item.key ? 'bg-zinc-950 text-white' : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-950'}`}
+            className={cx('flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left font-black transition-all', view === item.key ? ui.navActive : ui.nav)}
           >
             {item.icon}
             {item.label}
@@ -394,14 +554,24 @@ function Sidebar({ role, view, setView }: { role: AppRole; view: View; setView: 
   );
 }
 
-function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+function StatCard({
+  label,
+  value,
+  icon,
+  ui,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-5">
+    <div className={cx('rounded-[24px] border p-5 shadow-sm', ui.surface)}>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-bold text-zinc-500">{label}</div>
-        <div className="text-zinc-400">{icon}</div>
+        <div className={cx('text-sm font-bold', ui.muted)}>{label}</div>
+        <div className={ui.muted}>{icon}</div>
       </div>
-      <div className="mt-4 text-3xl font-black text-zinc-950">{value}</div>
+      <div className={cx('mt-4 text-3xl font-black', ui.strong)}>{value}</div>
     </div>
   );
 }
@@ -412,66 +582,84 @@ function Home({
   conversations,
   setView,
   setModule,
+  ui,
 }: {
   profile: StoreProfile;
   docs: KnowledgeDoc[];
   conversations: Conversation[];
   setView: (view: View) => void;
   setModule: (module: ModuleKey) => void;
+  ui: ReturnType<typeof useThemeTokens>;
 }) {
-  const assistantCount = conversations.flatMap((item) => item.messages).filter((message) => message.role === 'assistant' && message.content).length;
+  const aiCount = conversations.flatMap((item) => item.messages).filter((message) => message.role === 'assistant' && message.content).length;
+
   return (
     <div className="space-y-6 p-6">
-      <div className="rounded-lg border border-zinc-200 bg-white p-6">
+      <section className={cx('rounded-[28px] border p-7 shadow-sm', ui.surface)}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-zinc-950">今天从一个具体问题开始</h1>
-            <p className="mt-2 max-w-2xl text-zinc-500">当前所有结果都会优先结合门店资料、启用知识库和你选择的 Agent 板块。</p>
+            <div className={cx('text-sm font-bold uppercase tracking-[0.2em]', ui.muted)}>AI Workspace</div>
+            <h1 className={cx('mt-3 text-3xl font-black', ui.strong)}>今天从一个具体问题开始</h1>
+            <p className={cx('mt-3 max-w-2xl text-sm leading-7', ui.muted)}>
+              当前所有结果都会优先结合门店资料、启用知识库和你选择的 AI 模块，输出更贴近门店使用场景的方案。
+            </p>
           </div>
-          <button onClick={() => setView('agent')} className="rounded-lg bg-zinc-950 px-5 py-3 font-black text-white">进入 Agent</button>
+          <button onClick={() => setView('ai')} className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white">
+            进入 AI 对话
+          </button>
         </div>
-      </div>
+      </section>
+
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="历史对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} />
-        <StatCard label="启用资料" value={String(docs.filter((doc) => doc.active).length)} icon={<Database className="h-5 w-5" />} />
-        <StatCard label="本周产出" value={String(assistantCount)} icon={<CheckCircle2 className="h-5 w-5" />} />
+        <StatCard label="历史对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} ui={ui} />
+        <StatCard label="启用资料" value={String(docs.filter((doc) => doc.active).length)} icon={<Database className="h-5 w-5" />} ui={ui} />
+        <StatCard label="本周输出" value={String(aiCount)} icon={<Sparkles className="h-5 w-5" />} ui={ui} />
       </div>
-      <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
-          <h2 className="text-xl font-black text-zinc-950">常用 Agent</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+
+      <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className={cx('rounded-[28px] border p-6 shadow-sm', ui.surface)}>
+          <div className="flex items-center justify-between">
+            <h2 className={cx('text-xl font-black', ui.strong)}>常用 AI 模块</h2>
+            <span className={cx('text-sm font-bold', ui.muted)}>像 ChatGPT 一样自然切换</span>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
             {(Object.keys(modules) as ModuleKey[]).map((key) => (
               <button
                 key={key}
                 onClick={() => {
                   setModule(key);
-                  setView('agent');
+                  setView('ai');
                 }}
-                className="rounded-lg border border-zinc-200 p-4 text-left hover:border-zinc-950"
+                className={cx('group rounded-[24px] border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg', ui.surfaceAlt)}
               >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950 text-white">{modules[key].icon}</div>
-                <div className="font-black text-zinc-950">{modules[key].title}</div>
-                <div className="mt-1 text-sm leading-6 text-zinc-500">{modules[key].desc}</div>
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
+                  {modules[key].icon}
+                </div>
+                <div className={cx('font-black', ui.strong)}>{modules[key].title}</div>
+                <div className={cx('mt-2 text-sm leading-6', ui.muted)}>{modules[key].desc}</div>
               </button>
             ))}
           </div>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-6">
-          <h2 className="text-xl font-black text-zinc-950">门店资料</h2>
-          <div className="mt-5 space-y-3 text-sm leading-7 text-zinc-600">
-            <div><span className="font-black text-zinc-950">门店：</span>{profile.name}</div>
-            <div><span className="font-black text-zinc-950">类型：</span>{profile.storeType}</div>
-            <div><span className="font-black text-zinc-950">位置：</span>{profile.city}{profile.district}</div>
-            <div><span className="font-black text-zinc-950">客单价：</span>{profile.avgPrice} 元</div>
+        </section>
+
+        <section className={cx('rounded-[28px] border p-6 shadow-sm', ui.surface)}>
+          <h2 className={cx('text-xl font-black', ui.strong)}>门店资料</h2>
+          <div className={cx('mt-5 space-y-3 text-sm leading-7', ui.muted)}>
+            <div><span className={cx('font-black', ui.strong)}>门店：</span>{profile.name}</div>
+            <div><span className={cx('font-black', ui.strong)}>类型：</span>{profile.storeType || '待补充'}</div>
+            <div><span className={cx('font-black', ui.strong)}>位置：</span>{profile.city || '待补充'} {profile.district || ''}</div>
+            <div><span className={cx('font-black', ui.strong)}>客单价：</span>{profile.avgPrice || 0} 元</div>
           </div>
-          <button onClick={() => setView('profile')} className="mt-5 rounded-lg border border-zinc-200 px-4 py-3 text-sm font-black text-zinc-700 hover:border-zinc-950 hover:text-zinc-950">完善门店资料</button>
-        </div>
+          <button onClick={() => setView('profile')} className={cx('mt-5 rounded-full border px-4 py-3 text-sm font-black transition-all', ui.ghost)}>
+            完善门店资料
+          </button>
+        </section>
       </div>
     </div>
   );
 }
 
-function AgentWorkspace({
+function AIWorkspace({
   profile,
   docs,
   conversations,
@@ -480,6 +668,7 @@ function AgentWorkspace({
   setModule,
   search,
   selectedConversationId,
+  ui,
 }: {
   profile: StoreProfile;
   docs: KnowledgeDoc[];
@@ -489,6 +678,7 @@ function AgentWorkspace({
   setModule: React.Dispatch<React.SetStateAction<ModuleKey>>;
   search: string;
   selectedConversationId: string;
+  ui: ReturnType<typeof useThemeTokens>;
 }) {
   const [activeId, setActiveId] = useState(conversations[0]?.id ?? '');
   const [input, setInput] = useState('');
@@ -589,6 +779,7 @@ function AgentWorkspace({
 
     const controller = new AbortController();
     abortRef.current = controller;
+
     try {
       const result = await apiRequestWithSignal<{ content: string }>('/agent/chat', {
         question,
@@ -597,6 +788,7 @@ function AgentWorkspace({
         docs: activeDocs,
         messages: messages.slice(-8),
       }, controller.signal);
+
       setConversations((current) =>
         current.map((item) =>
           item.id === conversationId
@@ -608,7 +800,13 @@ function AgentWorkspace({
         ),
       );
     } catch (err) {
-      const content = err instanceof DOMException && err.name === 'AbortError' ? '已停止本次生成。' : err instanceof Error ? `API 调用失败：${err.message}` : 'API 调用失败，请检查后端配置。';
+      const content =
+        err instanceof DOMException && err.name === 'AbortError'
+          ? '已停止本次生成。'
+          : err instanceof Error
+            ? `AI 接口调用失败：${err.message}`
+            : 'AI 接口调用失败，请检查后端配置。';
+
       setConversations((current) =>
         current.map((item) =>
           item.id === conversationId
@@ -626,49 +824,69 @@ function AgentWorkspace({
   }
 
   return (
-    <div className="grid h-[calc(100vh-64px)] grid-cols-[340px_minmax(0,1fr)] overflow-hidden bg-white">
-      <aside className="border-r border-zinc-200 bg-zinc-50">
-        <div className="border-b border-zinc-200 p-5">
-          <button onClick={() => newConversation()} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-zinc-950 font-black text-white">
-            <Plus className="h-5 w-5" />
+    <div className="grid h-[calc(100vh-96px)] grid-cols-1 overflow-hidden xl:grid-cols-[290px_minmax(0,1fr)]">
+      <aside className={cx('hidden border-r xl:flex xl:flex-col', ui.surfaceAlt)}>
+        <div className="p-4">
+          <button onClick={() => newConversation()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-zinc-950 px-4 text-sm font-black text-white">
+            <Plus className="h-4 w-4" />
             新建对话
           </button>
         </div>
-        <div className="app-scrollbar h-[calc(100vh-145px)] overflow-y-scroll p-4">
-          {visibleConversations.length === 0 && <div className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-500">没有匹配的对话。</div>}
-          {visibleConversations.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveId(item.id);
-                setModule(item.module);
-              }}
-              className={`mb-3 w-full rounded-lg border p-4 text-left ${activeId === item.id ? 'border-zinc-950 bg-white shadow-sm' : 'border-transparent hover:bg-white'}`}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-500">{modules[item.module].label}</span>
-                <span className="text-xs font-bold text-zinc-400">{item.updatedAt}</span>
-              </div>
-              <div className="truncate font-black text-zinc-950">{item.title}</div>
-              <div className="mt-2 truncate text-sm text-zinc-500">{item.messages.at(-1)?.content || '还没有消息'}</div>
-            </button>
-          ))}
+        <div className="px-4 pb-4">
+          <div className={cx('rounded-[24px] border p-4 shadow-sm', ui.surface)}>
+            <div className={cx('text-xs font-bold uppercase tracking-[0.18em]', ui.muted)}>Conversations</div>
+            <div className={cx('mt-2 text-lg font-black', ui.strong)}>自然有序的对话列表</div>
+          </div>
+        </div>
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          {visibleConversations.length === 0 ? (
+            <div className={cx('rounded-[24px] border border-dashed p-5 text-sm', ui.muted)}>还没有匹配到相关对话。</div>
+          ) : (
+            visibleConversations.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveId(item.id);
+                  setModule(item.module);
+                }}
+                className={cx('mb-3 w-full rounded-[24px] border p-4 text-left shadow-sm transition-all', activeId === item.id ? ui.surface : ui.surfaceAlt, 'hover:-translate-y-0.5 hover:shadow-md')}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className={cx('rounded-full px-3 py-1 text-xs font-black', ui.soft)}>{modules[item.module].label}</span>
+                  <span className={cx('text-xs font-bold', ui.muted)}>{item.updatedAt}</span>
+                </div>
+                <div className={cx('truncate text-base font-black', ui.strong)}>{item.title}</div>
+                <div className={cx('mt-2 line-clamp-2 text-sm leading-6', ui.muted)}>{item.messages.at(-1)?.content || '还没有消息'}</div>
+              </button>
+            ))
+          )}
         </div>
       </aside>
 
-      <main className="relative flex min-w-0 min-h-0 flex-col bg-zinc-50">
-        <div className="border-b border-zinc-200 bg-white px-6 py-4">
-          <div className="flex items-start justify-between gap-4">
+      <main className="relative flex min-h-0 min-w-0 flex-col">
+        <div className={cx('border-b px-6 py-5', ui.surface)}>
+          <div className="mx-auto flex max-w-5xl flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <div className="text-zinc-950">{modules[module].icon}</div>
-                <h1 className="text-2xl font-black text-zinc-950">{modules[module].title}</h1>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white">
+                  {modules[module].icon}
+                </div>
+                <div>
+                  <h1 className={cx('text-2xl font-black', ui.strong)}>{modules[module].title}</h1>
+                  <p className={cx('mt-1 text-sm', ui.muted)}>{modules[module].desc}</p>
+                </div>
               </div>
-              <p className="mt-1 text-sm text-zinc-500">{modules[module].desc}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(modules) as ModuleKey[]).map((key) => (
-                <button key={key} onClick={() => (active?.messages.length ? newConversation(key) : setModule(key))} className={`rounded-lg border px-4 py-3 text-sm font-black ${moduleClasses(module === key)}`}>
+                <button
+                  key={key}
+                  onClick={() => (active?.messages.length ? newConversation(key) : setModule(key))}
+                  className={cx(
+                    'rounded-full border px-4 py-2.5 text-sm font-black transition-all',
+                    module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost,
+                  )}
+                >
                   {modules[key].label}
                 </button>
               ))}
@@ -676,62 +894,62 @@ function AgentWorkspace({
           </div>
         </div>
 
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-scroll px-6 py-8 pb-64">
-          <div className="mx-auto max-w-4xl space-y-5">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-60 md:px-6">
+          <div className="mx-auto max-w-5xl space-y-6">
             {messages.length === 0 ? (
-              <div className="rounded-lg border border-zinc-200 bg-white p-6">
-                <div className="mb-4 inline-flex rounded-lg bg-zinc-950 p-3 text-white">
+              <section className={cx('rounded-[28px] border p-6 shadow-sm', ui.surface)}>
+                <div className="mb-4 inline-flex rounded-2xl bg-zinc-950 p-3 text-white">
                   <Sparkles className="h-6 w-6" />
                 </div>
-                <h2 className="text-2xl font-black text-zinc-950">问一个具体问题</h2>
-                <p className="mt-2 text-sm text-zinc-500">Agent 会结合门店资料和启用知识库，并按当前板块输出结构化方案。</p>
+                <h2 className={cx('text-2xl font-black', ui.strong)}>问一个具体问题</h2>
+                <p className={cx('mt-2 text-sm leading-7', ui.muted)}>AI 会结合门店资料和启用知识库，按当前模块输出更贴合业务的结构化方案。</p>
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                   {starterPrompts[module].map((prompt) => (
-                    <button key={prompt} onClick={() => setInput(prompt)} className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-left text-sm font-bold leading-6 text-zinc-700 hover:border-zinc-950 hover:bg-white">
+                    <button key={prompt} onClick={() => setInput(prompt)} className={cx('rounded-[24px] border p-4 text-left text-sm font-bold leading-6 transition-all hover:-translate-y-0.5 hover:shadow-md', ui.surfaceAlt)}>
                       {prompt}
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
             ) : (
               messages.map((message) => (
-                <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {message.role === 'assistant' && (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950 text-white">
+                <div key={message.id} className={cx('flex gap-4', message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  {message.role === 'assistant' ? (
+                    <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
                       <Bot className="h-5 w-5" />
                     </div>
-                  )}
-                  <div className={`max-w-[760px] rounded-lg border p-5 shadow-sm ${message.role === 'user' ? 'border-zinc-950 bg-zinc-950 text-white' : 'border-zinc-200 bg-white text-zinc-800'}`}>
+                  ) : null}
+                  <div className={cx('max-w-[860px] rounded-[28px] border p-5 shadow-sm', message.role === 'user' ? ui.bubbleUser : ui.bubbleAi)}>
                     <div className="mb-3 flex items-center justify-between gap-8">
-                      <span className={`text-sm font-black ${message.role === 'user' ? 'text-zinc-300' : 'text-zinc-950'}`}>{message.role === 'user' ? '你' : modules[message.module].title}</span>
+                      <span className={cx('text-sm font-black', message.role === 'user' ? 'text-zinc-300' : ui.strong)}>{message.role === 'user' ? '你' : modules[message.module].title}</span>
                       <span className="text-xs text-zinc-400">{message.createdAt}</span>
                     </div>
-                    <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7">{message.content || '正在调用 Agent API...'}</pre>
+                    <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7">{message.content || '正在调用 AI 接口...'}</pre>
                     {message.attachments?.length ? <div className="mt-3 text-xs font-bold text-zinc-400">附件：{message.attachments.join('、')}</div> : null}
-                    {message.role === 'assistant' && message.content && (
-                      <button onClick={() => navigator.clipboard?.writeText(message.content)} className="mt-4 inline-flex items-center gap-2 rounded-md bg-zinc-100 px-3 py-2 text-xs font-black text-zinc-500 hover:text-zinc-950">
+                    {message.role === 'assistant' && message.content ? (
+                      <button onClick={() => navigator.clipboard?.writeText(message.content)} className={cx('mt-4 inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-black transition-all', ui.soft)}>
                         <Copy className="h-4 w-4" />
                         复制
                       </button>
-                    )}
+                    ) : null}
                   </div>
-                  {message.role === 'user' && (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950 text-white">
+                  {message.role === 'user' ? (
+                    <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-sm">
                       <UserRound className="h-5 w-5" />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ))
             )}
           </div>
         </div>
 
-        <form onSubmit={send} className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 p-5 backdrop-blur md:left-[340px]">
-          <div className="mx-auto max-w-4xl rounded-lg border border-zinc-200 bg-white p-4 shadow-lg">
-            {attachments.length > 0 && (
+        <form onSubmit={send} className={cx('fixed bottom-0 left-0 right-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6 xl:left-[566px]', ui.surface)}>
+          <div className={cx('mx-auto max-w-5xl rounded-[30px] border p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
+            {attachments.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-2">
                 {attachments.map((file) => (
-                  <span key={file} className="inline-flex items-center gap-2 rounded-md bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-600">
+                  <span key={file} className={cx('inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold', ui.soft)}>
                     <Paperclip className="h-4 w-4" />
                     {file}
                     <button type="button" onClick={() => setAttachments((current) => current.filter((item) => item !== file))}>
@@ -740,7 +958,7 @@ function AgentWorkspace({
                   </span>
                 ))}
               </div>
-            )}
+            ) : null}
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
@@ -750,11 +968,11 @@ function AgentWorkspace({
                   send();
                 }
               }}
-              className="h-24 w-full resize-none p-3 text-sm outline-none"
-              placeholder="描述你的问题，例如：帮我做一个适合写字楼人群的 9.9 元团购套餐..."
+              className={cx('h-28 w-full resize-none rounded-[22px] border p-4 text-sm leading-7 outline-none transition-all', ui.input)}
+              placeholder="描述你的问题，例如：帮我做一个适合写字楼人群的 9.9 元团购套餐……"
             />
-            <div className="flex items-center justify-between border-t border-zinc-100 pt-3">
-              <div className="flex items-center gap-3 text-zinc-400">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className={cx('flex items-center gap-3 text-sm font-bold', ui.muted)}>
                 <input
                   ref={fileRef}
                   type="file"
@@ -770,18 +988,18 @@ function AgentWorkspace({
                     setAttachments(names);
                   }}
                 />
-                <button type="button" onClick={() => fileRef.current?.click()} className="p-2 hover:text-zinc-950" title="添加附件">
+                <button type="button" onClick={() => fileRef.current?.click()} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)} title="添加附件">
                   <Paperclip className="h-5 w-5" />
                 </button>
-                <span className="text-sm font-bold">最多 3 个附件，当前为文件名随消息保存</span>
+                <span>最多 3 个附件，当前为文件名随消息保存</span>
               </div>
               {generating ? (
-                <button type="button" onClick={stop} className="flex items-center gap-2 rounded-lg bg-zinc-950 px-5 py-3 font-black text-white">
+                <button type="button" onClick={stop} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white">
                   <PauseCircle className="h-5 w-5" />
                   停止
                 </button>
               ) : (
-                <button disabled={!input.trim()} className="flex items-center gap-2 rounded-lg bg-zinc-950 px-5 py-3 font-black text-white disabled:bg-zinc-300">
+                <button disabled={!input.trim()} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white disabled:bg-zinc-300">
                   <Send className="h-5 w-5" />
                   发送
                 </button>
@@ -794,35 +1012,58 @@ function AgentWorkspace({
   );
 }
 
-function ProfilePage({ profile, setProfile }: { profile: StoreProfile; setProfile: React.Dispatch<React.SetStateAction<StoreProfile>> }) {
+function ProfilePage({
+  profile,
+  setProfile,
+  ui,
+}: {
+  profile: StoreProfile;
+  setProfile: React.Dispatch<React.SetStateAction<StoreProfile>>;
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   const fields: Array<[keyof StoreProfile, string, string]> = [
     ['name', '门店名称', '例如：锋芒私教工作室'],
     ['storeType', '门店类型', '例如：精品私教工作室'],
     ['city', '城市', '例如：杭州'],
-    ['district', '区县', '例如：滨江区'],
-    ['audience', '目标客群', '描述目标用户'],
-    ['goal', '业务目标', '描述当前目标'],
+    ['district', '区域', '例如：滨江区'],
+    ['audience', '目标客群', '描述你的核心用户'],
+    ['goal', '业务目标', '描述当前最想解决的问题'],
   ];
 
   return (
     <div className="p-6">
-      <div className="rounded-lg border border-zinc-200 bg-white p-6">
-        <h1 className="text-3xl font-black text-zinc-950">门店资料</h1>
-        <p className="mt-2 text-zinc-500">这些资料会作为 Agent 的默认上下文。</p>
+      <div className={cx('rounded-[28px] border p-6 shadow-sm', ui.surface)}>
+        <h1 className={cx('text-3xl font-black', ui.strong)}>门店资料</h1>
+        <p className={cx('mt-2 text-sm leading-7', ui.muted)}>这些资料会作为 AI 的默认上下文，影响后续方案生成。</p>
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           {fields.map(([key, label, placeholder]) => (
             <label key={key} className={key === 'audience' || key === 'goal' ? 'md:col-span-2' : ''}>
-              <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
+              <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>{label}</span>
               {key === 'audience' || key === 'goal' ? (
-                <textarea value={String(profile[key])} onChange={(event) => setProfile((current) => ({ ...current, [key]: event.target.value }))} className="h-28 w-full resize-none rounded-lg border border-zinc-200 p-4 outline-none focus:border-zinc-950" placeholder={placeholder} />
+                <textarea
+                  value={String(profile[key])}
+                  onChange={(event) => setProfile((current) => ({ ...current, [key]: event.target.value }))}
+                  className={cx('h-28 w-full resize-none rounded-[24px] border p-4 outline-none transition-all', ui.input)}
+                  placeholder={placeholder}
+                />
               ) : (
-                <input value={String(profile[key])} onChange={(event) => setProfile((current) => ({ ...current, [key]: event.target.value }))} className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" placeholder={placeholder} />
+                <input
+                  value={String(profile[key])}
+                  onChange={(event) => setProfile((current) => ({ ...current, [key]: event.target.value }))}
+                  className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)}
+                  placeholder={placeholder}
+                />
               )}
             </label>
           ))}
           <label>
-            <span className="mb-2 block text-sm font-bold text-zinc-700">平均客单价</span>
-            <input value={profile.avgPrice} onChange={(event) => setProfile((current) => ({ ...current, avgPrice: Number(event.target.value) }))} type="number" className="h-12 w-full rounded-lg border border-zinc-200 px-4 outline-none focus:border-zinc-950" />
+            <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>平均客单价</span>
+            <input
+              value={profile.avgPrice}
+              onChange={(event) => setProfile((current) => ({ ...current, avgPrice: Number(event.target.value) }))}
+              type="number"
+              className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)}
+            />
           </label>
         </div>
       </div>
@@ -830,26 +1071,36 @@ function ProfilePage({ profile, setProfile }: { profile: StoreProfile; setProfil
   );
 }
 
-function HistoryPage({ conversations, openConversation, search }: { conversations: Conversation[]; openConversation: (id: string, module: ModuleKey) => void; search: string }) {
+function HistoryPage({
+  conversations,
+  openConversation,
+  search,
+  ui,
+}: {
+  conversations: Conversation[];
+  openConversation: (id: string, module: ModuleKey) => void;
+  search: string;
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   const keyword = search.trim().toLowerCase();
   const visible = conversations.filter((conversation) => !keyword || [conversation.title, modules[conversation.module].label, ...conversation.messages.map((message) => message.content)].join(' ').toLowerCase().includes(keyword));
   return (
     <div className="p-6">
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-200 p-6">
-          <h1 className="text-3xl font-black text-zinc-950">历史记录</h1>
-          <p className="mt-2 text-zinc-500">所有 Agent 对话会保存在这里。</p>
+      <div className={cx('rounded-[28px] border shadow-sm', ui.surface)}>
+        <div className="border-b border-zinc-200 p-6 dark:border-zinc-800">
+          <h1 className={cx('text-3xl font-black', ui.strong)}>历史记录</h1>
+          <p className={cx('mt-2 text-sm leading-7', ui.muted)}>所有 AI 对话都会保存在这里。</p>
         </div>
         {visible.length === 0 ? (
-          <div className="p-10 text-center text-zinc-500">暂无历史记录。</div>
+          <div className={cx('p-10 text-center text-sm', ui.muted)}>暂无历史记录。</div>
         ) : (
           visible.map((conversation) => (
-            <button key={conversation.id} onClick={() => openConversation(conversation.id, conversation.module)} className="flex w-full items-center justify-between border-b border-zinc-100 p-5 text-left last:border-0 hover:bg-zinc-50">
+            <button key={conversation.id} onClick={() => openConversation(conversation.id, conversation.module)} className={cx('flex w-full items-center justify-between border-b p-5 text-left transition-all last:border-0 hover:opacity-90', ui.surface)}>
               <div>
-                <div className="text-lg font-black text-zinc-950">{conversation.title}</div>
-                <div className="mt-1 text-sm text-zinc-500">{modules[conversation.module].label} · {conversation.updatedAt}</div>
+                <div className={cx('text-lg font-black', ui.strong)}>{conversation.title}</div>
+                <div className={cx('mt-1 text-sm', ui.muted)}>{modules[conversation.module].label} · {conversation.updatedAt}</div>
               </div>
-              <Clock3 className="h-5 w-5 text-zinc-300" />
+              <Clock3 className={cx('h-5 w-5', ui.muted)} />
             </button>
           ))
         )}
@@ -858,7 +1109,13 @@ function HistoryPage({ conversations, openConversation, search }: { conversation
   );
 }
 
-function StaffHome({ conversations }: { conversations: Conversation[] }) {
+function StaffHome({
+  conversations,
+  ui,
+}: {
+  conversations: Conversation[];
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   const [stats, setStats] = useState<{ users: number; userAccounts: number; staffAccounts: number; activeSessions: number } | null>(null);
   const [error, setError] = useState('');
 
@@ -877,88 +1134,252 @@ function StaffHome({ conversations }: { conversations: Conversation[] }) {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-6">
+      <div className={cx('flex items-center justify-between rounded-[28px] border p-6 shadow-sm', ui.surface)}>
         <div>
-          <h1 className="text-3xl font-black text-zinc-950">工作者后台</h1>
-          <p className="mt-2 text-zinc-500">这里展示真实后端账号统计和本机对话记录。</p>
+          <h1 className={cx('text-3xl font-black', ui.strong)}>工作者后台</h1>
+          <p className={cx('mt-2 text-sm leading-7', ui.muted)}>这里展示真实账号统计和本机对话记录。</p>
         </div>
-        <button onClick={loadStats} className="flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-3 text-sm font-black text-zinc-600 hover:border-zinc-950 hover:text-zinc-950">
+        <button onClick={loadStats} className={cx('flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-black transition-all', ui.ghost)}>
           <RefreshCw className="h-4 w-4" />
           刷新
         </button>
       </div>
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-600">{error}</div>}
+      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-600">{error}</div> : null}
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="注册账号" value={String(stats?.users ?? 0)} icon={<Users className="h-5 w-5" />} />
-        <StatCard label="用户账号" value={String(stats?.userAccounts ?? 0)} icon={<UserRound className="h-5 w-5" />} />
-        <StatCard label="工作者账号" value={String(stats?.staffAccounts ?? 0)} icon={<ShieldCheck className="h-5 w-5" />} />
-        <StatCard label="本机对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} />
+        <StatCard label="注册账号" value={String(stats?.users ?? 0)} icon={<Users className="h-5 w-5" />} ui={ui} />
+        <StatCard label="用户账号" value={String(stats?.userAccounts ?? 0)} icon={<UserRound className="h-5 w-5" />} ui={ui} />
+        <StatCard label="工作者账号" value={String(stats?.staffAccounts ?? 0)} icon={<ShieldCheck className="h-5 w-5" />} ui={ui} />
+        <StatCard label="本机对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} ui={ui} />
       </div>
     </div>
   );
 }
 
-function KnowledgePage({ docs, setDocs }: { docs: KnowledgeDoc[]; setDocs: React.Dispatch<React.SetStateAction<KnowledgeDoc[]>> }) {
+function KnowledgePage({
+  docs,
+  setDocs,
+  ui,
+}: {
+  docs: KnowledgeDoc[];
+  setDocs: React.Dispatch<React.SetStateAction<KnowledgeDoc[]>>;
+  ui: ReturnType<typeof useThemeTokens>;
+}) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
-    const nextDocs = Array.from({ length: files.length }, (_, index) => files.item(index)).filter(
-      (file): file is File => Boolean(file),
-    ).map((file) => ({
-      id: id('doc'),
-      title: file.name,
-      category: '上传资料',
-      module: 'groupbuy' as ModuleKey,
-      active: true,
-      calls: 0,
-    }));
+    const nextDocs = Array.from({ length: files.length }, (_, index) => files.item(index))
+      .filter((file): file is File => Boolean(file))
+      .map((file) => ({
+        id: id('doc'),
+        title: file.name,
+        category: '上传资料',
+        module: 'groupbuy' as ModuleKey,
+        active: true,
+        calls: 0,
+      }));
     setDocs((current) => [...nextDocs, ...current]);
   }
 
   return (
     <div className="p-6">
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="flex items-center justify-between border-b border-zinc-200 p-6">
+      <div className={cx('rounded-[28px] border shadow-sm', ui.surface)}>
+        <div className="flex items-center justify-between border-b border-zinc-200 p-6 dark:border-zinc-800">
           <div>
-            <h1 className="text-3xl font-black text-zinc-950">知识库</h1>
-            <p className="mt-2 text-zinc-500">启用的资料会传给 Agent API 作为上下文摘要。</p>
+            <h1 className={cx('text-3xl font-black', ui.strong)}>知识库</h1>
+            <p className={cx('mt-2 text-sm leading-7', ui.muted)}>启用的资料会传给 AI 作为上下文摘要。</p>
           </div>
           <input ref={fileRef} type="file" multiple className="hidden" onChange={(event) => addFiles(event.currentTarget.files)} />
-          <button onClick={() => fileRef.current?.click()} className="flex items-center gap-2 rounded-lg bg-zinc-950 px-5 py-3 font-black text-white">
+          <button onClick={() => fileRef.current?.click()} className="flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white">
             <Upload className="h-5 w-5" />
             上传资料
           </button>
         </div>
-        <div className="divide-y divide-zinc-100">
+        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {docs.map((doc) => (
             <div key={doc.id} className="flex flex-wrap items-center justify-between gap-4 p-5">
               <div>
-                <div className="font-black text-zinc-950">{doc.title}</div>
-                <div className="mt-1 text-sm text-zinc-500">{doc.category} · {modules[doc.module].label} · 调用 {doc.calls} 次</div>
+                <div className={cx('font-black', ui.strong)}>{doc.title}</div>
+                <div className={cx('mt-1 text-sm', ui.muted)}>{doc.category} · {modules[doc.module].label} · 调用 {doc.calls} 次</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {(Object.keys(modules) as ModuleKey[]).map((key) => (
-                  <button key={key} onClick={() => setDocs((current) => current.map((item) => (item.id === doc.id ? { ...item, module: key } : item)))} className={`rounded-md border px-3 py-2 text-xs font-black ${doc.module === key ? 'border-zinc-950 bg-zinc-950 text-white' : 'border-zinc-200 text-zinc-500'}`}>
+                  <button key={key} onClick={() => setDocs((current) => current.map((item) => (item.id === doc.id ? { ...item, module: key } : item)))} className={cx('rounded-full border px-3 py-2 text-xs font-black transition-all', doc.module === key ? 'border-zinc-950 bg-zinc-950 text-white' : ui.ghost)}>
                     {modules[key].label}
                   </button>
                 ))}
-                <button onClick={() => setDocs((current) => current.map((item) => (item.id === doc.id ? { ...item, active: !item.active } : item)))} className={`rounded-lg px-4 py-3 text-sm font-black ${doc.active ? 'bg-zinc-950 text-white' : 'bg-zinc-100 text-zinc-500'}`}>
+                <button onClick={() => setDocs((current) => current.map((item) => (item.id === doc.id ? { ...item, active: !item.active } : item)))} className={cx('rounded-full px-4 py-3 text-sm font-black transition-all', doc.active ? 'bg-zinc-950 text-white' : ui.soft)}>
                   {doc.active ? '已启用' : '未启用'}
                 </button>
-                <button onClick={() => setDocs((current) => current.filter((item) => item.id !== doc.id))} className="rounded-lg border border-zinc-200 px-4 py-3 text-sm font-black text-zinc-500 hover:border-red-300 hover:text-red-600">
+                <button onClick={() => setDocs((current) => current.filter((item) => item.id !== doc.id))} className="rounded-full border border-zinc-200 px-4 py-3 text-sm font-black text-zinc-500 transition-all hover:border-red-300 hover:text-red-600">
                   删除
                 </button>
               </div>
             </div>
           ))}
-          {docs.length === 0 && <div className="p-10 text-center text-zinc-500">暂无知识库资料。</div>}
+          {docs.length === 0 ? <div className={cx('p-10 text-center text-sm', ui.muted)}>暂无知识库资料。</div> : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountSettingsModal({
+  open,
+  user,
+  role,
+  ui,
+  onClose,
+  onUpdated,
+}: {
+  open: boolean;
+  user: AuthUser;
+  role: AppRole;
+  ui: ReturnType<typeof useThemeTokens>;
+  onClose: () => void;
+  onUpdated: (user: AuthUser) => void;
+}) {
+  const [name, setName] = useState(user.name);
+  const [account, setAccount] = useState(user.account);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setName(user.name);
+    setAccount(user.account);
+  }, [user]);
+
+  if (!open) return null;
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setSavingProfile(true);
+    try {
+      const result = await apiRequest<{ user: AuthUser }>('/account/update-profile', {
+        role,
+        currentAccount: user.account,
+        account,
+        name,
+      });
+      localStorage.setItem(`fitness_user_${role}`, JSON.stringify(result.user));
+      onUpdated(result.user);
+      setMessage('账户资料已更新。');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function savePassword(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    if (!isPasswordValid(newPassword)) {
+      setError('新密码至少 6 位，且必须同时包含英文和数字');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('两次输入的新密码不一致');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await apiRequest('/account/update-password', {
+        role,
+        account: user.account,
+        currentPassword,
+        newPassword,
+        newPasswordConfirm: confirmPassword,
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage('密码已更新。');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '密码更新失败');
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/55 p-4 backdrop-blur-sm">
+      <div className={cx('w-full max-w-3xl rounded-[32px] border shadow-2xl', ui.surface)}>
+        <div className="flex items-center justify-between border-b border-zinc-200 p-6 dark:border-zinc-800">
+          <div>
+            <div className={cx('text-sm font-bold uppercase tracking-[0.18em]', ui.muted)}>Account</div>
+            <h2 className={cx('mt-2 text-2xl font-black', ui.strong)}>账户设置</h2>
+          </div>
+          <button onClick={onClose} className={cx('flex h-10 w-10 items-center justify-center rounded-full border transition-all', ui.ghost)}>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="grid gap-0 lg:grid-cols-[1fr_1fr]">
+          <form onSubmit={saveProfile} className="space-y-4 p-6">
+            <div className="flex items-center gap-2">
+              <PencilLine className="h-5 w-5" />
+              <h3 className={cx('text-lg font-black', ui.strong)}>资料信息</h3>
+            </div>
+            <label className="block">
+              <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>名称</span>
+              <input value={name} onChange={(event) => setName(event.target.value)} className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} />
+            </label>
+            <label className="block">
+              <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>邮箱 / 手机号</span>
+              <div className="relative">
+                <Mail className={cx('absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2', ui.muted)} />
+                <input value={account} onChange={(event) => setAccount(event.target.value)} className={cx('h-12 w-full rounded-2xl border pl-11 pr-4 outline-none transition-all', ui.input)} />
+              </div>
+            </label>
+            <button disabled={savingProfile} className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white disabled:bg-zinc-400">
+              {savingProfile ? '保存中...' : '保存资料'}
+            </button>
+          </form>
+          <form onSubmit={savePassword} className="space-y-4 border-t border-zinc-200 p-6 dark:border-zinc-800 lg:border-l lg:border-t-0">
+            <div className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              <h3 className={cx('text-lg font-black', ui.strong)}>安全设置</h3>
+            </div>
+            <label className="block">
+              <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>当前密码</span>
+              <input value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} type="password" className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} />
+            </label>
+            <label className="block">
+              <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>新密码</span>
+              <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} placeholder="至少 6 位，包含英文和数字" />
+            </label>
+            <label className="block">
+              <span className={cx('mb-2 block text-sm font-bold', ui.muted)}>确认新密码</span>
+              <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" className={cx('h-12 w-full rounded-2xl border px-4 outline-none transition-all', ui.input)} />
+            </label>
+            <button disabled={savingPassword} className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white disabled:bg-zinc-400">
+              {savingPassword ? '更新中...' : '更新密码'}
+            </button>
+          </form>
+        </div>
+        {(message || error) ? (
+          <div className="px-6 pb-6">
+            <div className={cx('rounded-2xl border px-4 py-3 text-sm font-bold', error ? 'border-red-200 bg-red-50 text-red-600' : 'border-emerald-200 bg-emerald-50 text-emerald-600')}>
+              {error || message}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function AppShell() {
+  useClickGlow();
+  const systemDark = useSystemDark();
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStorage<ThemeMode>('fitness_theme_mode', 'system'));
   const [role] = useState<AppRole>(getPortalRole);
   const [fatalError, setFatalError] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(() => readStorage<AuthUser | null>(`fitness_user_${getPortalRole()}`, null));
@@ -966,6 +1387,7 @@ function AppShell() {
   const [module, setModule] = useState<ModuleKey>('groupbuy');
   const [search, setSearch] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [accountOpen, setAccountOpen] = useState(false);
   const [profile, setProfile] = useState<StoreProfile>(() => readStorage('fitness_profile', defaultProfile));
   const [docs, setDocs] = useState<KnowledgeDoc[]>(() =>
     readStorage('fitness_docs', [
@@ -975,6 +1397,18 @@ function AppShell() {
     ]),
   );
   const [conversations, setConversations] = useState<Conversation[]>(() => readStorage('fitness_conversations', []));
+
+  const resolvedTheme = getResolvedTheme(themeMode, systemDark);
+  const ui = useThemeTokens(resolvedTheme === 'dark');
+
+  useEffect(() => {
+    localStorage.setItem('fitness_theme_mode', JSON.stringify(themeMode));
+  }, [themeMode]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.title = 'AI健身房运营助手';
+  }, [resolvedTheme]);
 
   useEffect(() => {
     localStorage.setItem('fitness_profile', JSON.stringify(profile));
@@ -1000,18 +1434,16 @@ function AppShell() {
 
   if (fatalError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-100 p-6">
-        <div className="w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-black text-zinc-950">页面加载失败</h1>
-          <p className="mt-3 text-sm leading-7 text-zinc-500">
-            可能是旧缓存数据或页面状态异常。清理本地缓存后会重新打开当前入口。
-          </p>
+      <div className={cx('flex min-h-screen items-center justify-center p-6', ui.page)}>
+        <div className={cx('w-full max-w-lg rounded-[32px] border p-8 text-center shadow-sm', ui.surface)}>
+          <h1 className={cx('text-2xl font-black', ui.strong)}>页面加载失败</h1>
+          <p className={cx('mt-3 text-sm leading-7', ui.muted)}>可能是旧缓存数据或页面状态异常。清理本地缓存后会重新打开当前入口。</p>
           <button
             onClick={() => {
               resetAppStorage();
               window.location.href = role === 'staff' ? '/staff' : '/user';
             }}
-            className="mt-6 rounded-lg bg-zinc-950 px-5 py-3 font-black text-white"
+            className="mt-6 rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white"
           >
             清理缓存并重新进入
           </button>
@@ -1020,7 +1452,7 @@ function AppShell() {
     );
   }
 
-  if (!user) return <AuthPage role={role} onAuthed={setUser} />;
+  if (!user) return <AuthPage role={role} onAuthed={setUser} ui={ui} />;
 
   const effectiveRole = user.role === role ? role : user.role;
 
@@ -1032,28 +1464,55 @@ function AppShell() {
   function openConversation(nextId: string, nextModule: ModuleKey) {
     setSelectedConversationId(nextId);
     setModule(nextModule);
-    setView('agent');
+    setView('ai');
   }
 
   const content = (() => {
     if (effectiveRole === 'staff') {
-      if (view === 'knowledge') return <KnowledgePage docs={docs} setDocs={setDocs} />;
-      if (view === 'records') return <HistoryPage conversations={conversations} openConversation={openConversation} search={search} />;
-      return <StaffHome conversations={conversations} />;
+      if (view === 'knowledge') return <KnowledgePage docs={docs} setDocs={setDocs} ui={ui} />;
+      if (view === 'records') return <HistoryPage conversations={conversations} openConversation={openConversation} search={search} ui={ui} />;
+      return <StaffHome conversations={conversations} ui={ui} />;
     }
-    if (view === 'agent') return <AgentWorkspace profile={profile} docs={docs} conversations={conversations} setConversations={setConversations} module={module} setModule={setModule} search={search} selectedConversationId={selectedConversationId} />;
-    if (view === 'history') return <HistoryPage conversations={conversations} openConversation={openConversation} search={search} />;
-    if (view === 'profile') return <ProfilePage profile={profile} setProfile={setProfile} />;
-    return <Home profile={profile} docs={docs} conversations={conversations} setView={setView} setModule={setModule} />;
+
+    if (view === 'ai') {
+      return (
+        <AIWorkspace
+          profile={profile}
+          docs={docs}
+          conversations={conversations}
+          setConversations={setConversations}
+          module={module}
+          setModule={setModule}
+          search={search}
+          selectedConversationId={selectedConversationId}
+          ui={ui}
+        />
+      );
+    }
+
+    if (view === 'history') return <HistoryPage conversations={conversations} openConversation={openConversation} search={search} ui={ui} />;
+    if (view === 'profile') return <ProfilePage profile={profile} setProfile={setProfile} ui={ui} />;
+    return <Home profile={profile} docs={docs} conversations={conversations} setView={setView} setModule={setModule} ui={ui} />;
   })();
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950">
-      <TopBar role={effectiveRole} user={user} setView={setView} onLogout={logout} search={search} setSearch={setSearch} />
+    <div className={cx('min-h-screen', ui.page)}>
+      <TopBar
+        role={effectiveRole}
+        user={user}
+        search={search}
+        setSearch={setSearch}
+        onLogout={logout}
+        onOpenAccount={() => setAccountOpen(true)}
+        themeMode={themeMode}
+        setThemeMode={setThemeMode}
+        ui={ui}
+      />
       <div className="flex">
-        <Sidebar role={effectiveRole} view={view} setView={setView} />
+        <Sidebar role={effectiveRole} user={user} view={view} setView={setView} ui={ui} />
         <main className="min-w-0 flex-1">{content}</main>
       </div>
+      <AccountSettingsModal open={accountOpen} user={user} role={role} ui={ui} onClose={() => setAccountOpen(false)} onUpdated={setUser} />
     </div>
   );
 }

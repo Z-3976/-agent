@@ -348,6 +348,67 @@ app.post('/api/auth/login/password', async (request, response) => {
   response.json({ token, user: publicUser(user) });
 });
 
+app.post('/api/account/update-profile', async (request, response) => {
+  const role = normalizeRole(request.body.role);
+  const currentAccountInfo = normalizeAccount(request.body.currentAccount);
+  const nextAccountInfo = normalizeAccount(request.body.account);
+  const name = typeof request.body.name === 'string' ? request.body.name.trim() : '';
+
+  if (!role || !currentAccountInfo || !nextAccountInfo || !name) {
+    return response.status(400).json({ message: '请填写完整的账户资料' });
+  }
+
+  const db = await readDb();
+  const user = db.users.find((item) => item.role === role && getUserAccount(item) === currentAccountInfo.account);
+  if (!user) return response.status(404).json({ message: '当前账号不存在，请重新登录' });
+
+  const duplicate = db.users.some((item) => item.id !== user.id && item.role === role && getUserAccount(item) === nextAccountInfo.account);
+  if (duplicate) return response.status(409).json({ message: '该账号已被使用，请更换后再试' });
+
+  user.name = name;
+  user.account = nextAccountInfo.account;
+  user.accountType = nextAccountInfo.accountType;
+  user.phone = nextAccountInfo.accountType === 'phone' ? nextAccountInfo.account : undefined;
+  await writeDb(db);
+
+  response.json({ user: publicUser(user) });
+});
+
+app.post('/api/account/update-password', async (request, response) => {
+  const role = normalizeRole(request.body.role);
+  const accountInfo = normalizeAccount(request.body.account);
+  const currentPassword = typeof request.body.currentPassword === 'string' ? request.body.currentPassword : '';
+  const newPassword = typeof request.body.newPassword === 'string' ? request.body.newPassword : '';
+  const newPasswordConfirm = typeof request.body.newPasswordConfirm === 'string' ? request.body.newPasswordConfirm : '';
+
+  if (!role || !accountInfo || !currentPassword || !newPassword) {
+    return response.status(400).json({ message: '请填写完整的密码信息' });
+  }
+
+  if (!isPasswordValid(newPassword)) {
+    return response.status(400).json({ message: '密码至少 6 位，且必须同时包含英文和数字' });
+  }
+
+  if (newPassword !== newPasswordConfirm) {
+    return response.status(400).json({ message: '两次输入的新密码不一致' });
+  }
+
+  const db = await readDb();
+  const user = db.users.find((item) => item.role === role && getUserAccount(item) === accountInfo.account);
+  if (!user) return response.status(404).json({ message: '当前账号不存在，请重新登录' });
+
+  if (!verifySecret(currentPassword, user.passwordHash, user.passwordSalt)) {
+    return response.status(401).json({ message: '当前密码错误' });
+  }
+
+  const passwordSecret = hashSecret(newPassword);
+  user.passwordHash = passwordSecret.hash;
+  user.passwordSalt = passwordSecret.salt;
+  await writeDb(db);
+
+  response.json({ success: true });
+});
+
 app.post('/api/auth/register-legacy', async (request, response) => {
   const role = normalizeRole(request.body.role);
   const accountInfo = normalizeAccount(request.body.account ?? request.body.phone);

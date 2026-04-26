@@ -11,6 +11,14 @@
 }
 
 @layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-zinc-50 text-zinc-900 antialiased;
   }
@@ -19,6 +27,24 @@
   body,
   #root {
     min-height: 100%;
+  }
+
+  button,
+  a,
+  input,
+  textarea {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease,
+      opacity 180ms ease;
+  }
+
+  button:not(:disabled):active,
+  a:active {
+    transform: scale(0.985);
   }
 }
 
@@ -54,4 +80,32 @@
   border: 2px solid transparent;
   border-radius: 9999px;
   background-clip: content-box;
+}
+
+.click-spark {
+  position: fixed;
+  z-index: 9999;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  pointer-events: none;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.18);
+  box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.28);
+  animation: click-spark 420ms ease-out forwards;
+}
+
+@keyframes click-spark {
+  0% {
+    opacity: 1;
+    transform: scale(0.4);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.28);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2.8);
+    box-shadow: 0 0 0 18px rgba(99, 102, 241, 0);
+  }
 }
