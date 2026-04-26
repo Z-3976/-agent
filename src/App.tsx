@@ -451,7 +451,7 @@ function TopBar({
           </div>
         </div>
         {role === 'user' ? (
-          <div className="mx-auto hidden w-full max-w-[560px] md:block">
+          <div className="mx-auto hidden w-full max-w-[500px] md:block">
             <div className="grid grid-cols-4 gap-3">
               {(Object.keys(modules) as ModuleKey[]).map((key) => (
                 <div key={key} className="group relative">
@@ -855,7 +855,7 @@ function AIWorkspace({
 
     try {
       const result = await apiRequestWithSignal<{ content: string }>('/agent/chat-v2', {
-        question,
+        question: `${question}\n\n补充要求：必须结合门店资料回答；只说确定的信息；输出简短、干练、可执行；优先用 3 到 5 条短句，不要空话，不要幻想。`,
         module,
         profile,
         docs: activeDocs,
@@ -963,7 +963,7 @@ function AIWorkspace({
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-zinc-950 text-white">
                   {modules[module].icon}
                 </div>
-                <div>
+                <div className="max-w-[320px]">
                   <h1 className={cx('text-xl font-black', ui.strong)}>{modules[module].title}</h1>
                   <p className={cx('mt-1 text-[13px]', ui.muted)}>{modules[module].desc}</p>
                 </div>
@@ -992,7 +992,7 @@ function AIWorkspace({
                       <Bot className="h-5 w-5" />
                     </div>
                   ) : null}
-                  <div className={cx('max-w-[780px] rounded-[26px] border p-4 shadow-sm', message.role === 'user' ? ui.bubbleUser : ui.bubbleAi)}>
+                  <div className={cx('max-w-[520px] rounded-[26px] border p-4 shadow-sm', message.role === 'user' ? ui.bubbleUser : ui.bubbleAi)}>
                     <div className="mb-3 flex items-center justify-between gap-8">
                       <span className={cx('text-sm font-black', message.role === 'user' ? 'text-zinc-300' : ui.strong)}>{message.role === 'user' ? '你' : modules[message.module].title}</span>
                       <span className="text-xs text-zinc-400">{message.createdAt}</span>
@@ -1019,7 +1019,7 @@ function AIWorkspace({
         </div>
 
         <form onSubmit={send} className={cx('sticky bottom-0 z-30 border-t px-4 py-4 backdrop-blur-xl md:px-6', ui.surface)}>
-          <div className={cx('mx-auto max-w-5xl rounded-[30px] border p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
+          <div className={cx('mx-auto max-w-5xl rounded-[28px] border px-4 py-3 shadow-[0_20px_50px_rgba(15,23,42,0.12)]', ui.surface)}>
             {attachments.length > 0 ? (
               <div className="mb-3 flex flex-wrap gap-2">
                 {attachments.map((file) => (
@@ -1042,7 +1042,7 @@ function AIWorkspace({
                   send();
                 }
               }}
-              className={cx('h-28 w-full resize-none rounded-[22px] border p-4 text-[13px] leading-6 outline-none transition-all', ui.input)}
+              className={cx('h-20 w-full resize-none rounded-[20px] border px-4 py-3 text-[13px] leading-6 outline-none transition-all', ui.input)}
               placeholder="描述你的问题，例如：帮我做一个适合写字楼人群的 9.9 元团购套餐……"
             />
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
