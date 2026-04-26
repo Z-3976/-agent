@@ -686,6 +686,7 @@ function AIWorkspace({
   const [generating, setGenerating] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const active = conversations.find((item) => item.id === activeId) ?? conversations[0];
   const messages = active?.messages ?? [];
   const activeDocs = docs.filter((doc) => doc.active && doc.module === module);
@@ -704,6 +705,13 @@ function AIWorkspace({
   }, [selectedConversationId]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: messages.length > 1 ? 'smooth' : 'auto',
+      block: 'end',
+    });
+  }, [messages.length, generating, activeId]);
 
   function newConversation(nextModule = module) {
     const next: Conversation = {
@@ -894,18 +902,18 @@ function AIWorkspace({
           </div>
         </div>
 
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-60 md:px-6">
-          <div className="mx-auto max-w-5xl space-y-6">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-56 md:px-6 md:py-5">
+          <div className="mx-auto max-w-5xl space-y-5">
             {messages.length === 0 ? (
-              <section className={cx('rounded-[28px] border p-6 shadow-sm', ui.surface)}>
-                <div className="mb-4 inline-flex rounded-2xl bg-zinc-950 p-3 text-white">
-                  <Sparkles className="h-6 w-6" />
+              <section className={cx('rounded-[28px] border p-5 shadow-sm', ui.surface)}>
+                <div className="mb-3 inline-flex rounded-2xl bg-zinc-950 p-3 text-white">
+                  <Sparkles className="h-5 w-5" />
                 </div>
                 <h2 className={cx('text-2xl font-black', ui.strong)}>问一个具体问题</h2>
                 <p className={cx('mt-2 text-sm leading-7', ui.muted)}>AI 会结合门店资料和启用知识库，按当前模块输出更贴合业务的结构化方案。</p>
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {starterPrompts[module].map((prompt) => (
-                    <button key={prompt} onClick={() => setInput(prompt)} className={cx('rounded-[24px] border p-4 text-left text-sm font-bold leading-6 transition-all hover:-translate-y-0.5 hover:shadow-md', ui.surfaceAlt)}>
+                    <button key={prompt} onClick={() => setInput(prompt)} className={cx('rounded-[22px] border p-4 text-left text-sm font-bold leading-6 transition-all hover:-translate-y-0.5 hover:shadow-md', ui.surfaceAlt)}>
                       {prompt}
                     </button>
                   ))}
@@ -941,6 +949,7 @@ function AIWorkspace({
                 </div>
               ))
             )}
+            <div ref={messagesEndRef} />
           </div>
         </div>
 
