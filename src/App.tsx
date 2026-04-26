@@ -528,17 +528,47 @@ function TopBar({
       <div className="md:hidden">
         <div className="flex items-center justify-between gap-3">
           {role === 'user' ? (
-            <button onClick={() => setMobileModuleOpen((current) => !current)} className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all', ui.ghost)}>
+            <button
+              onClick={() =>
+                setMobileModuleOpen((current) => {
+                  const next = !current;
+                  if (next) {
+                    setMobileHeaderOpen(false);
+                    setThemeOpen(false);
+                  }
+                  return next;
+                })
+              }
+              className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all', ui.ghost)}
+            >
               <Menu className="h-5 w-5" />
             </button>
           ) : (
             <div className="h-11 w-11 shrink-0" />
           )}
-          <button onClick={() => setMobileHeaderOpen((current) => !current)} className="min-w-0 flex-1 text-center">
+          <button
+            onClick={() =>
+              setMobileHeaderOpen((current) => {
+                const next = !current;
+                if (next) setMobileModuleOpen(false);
+                return next;
+              })
+            }
+            className="min-w-0 flex-1 text-center"
+          >
             <div className={cx('truncate text-[18px] font-black', ui.strong)}>AI健身房运营助手</div>
             <div className={cx('truncate text-[11px] font-bold', ui.muted)}>{role === 'staff' ? '工作者端' : '用户端'}</div>
           </button>
-          <button onClick={() => setMobileHeaderOpen((current) => !current)} className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all', ui.ghost)}>
+          <button
+            onClick={() =>
+              setMobileHeaderOpen((current) => {
+                const next = !current;
+                if (next) setMobileModuleOpen(false);
+                return next;
+              })
+            }
+            className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all', ui.ghost)}
+          >
             <MoreHorizontal className="h-5 w-5" />
           </button>
         </div>
@@ -1389,7 +1419,7 @@ function StaffHome({
         <StatCard label="本机对话" value={String(conversations.length)} icon={<MessageSquare className="h-5 w-5" />} ui={ui} />
       </div>
       <div className={cx('rounded-[28px] border shadow-sm', ui.surface)}>
-        <div className="flex items-center justify-between border-b border-zinc-200 p-6 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-800 sm:p-5 dark:border-zinc-800">
           <div>
             <h2 className={cx('text-2xl font-black', ui.strong)}>已注册用户</h2>
             <p className={cx('mt-2 text-sm leading-7', ui.muted)}>用户注册的账号信息保存在工作者端，可在这里查看。</p>
@@ -1589,7 +1619,7 @@ function AccountSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/55 p-4 backdrop-blur-sm">
-      <div className={cx('w-full max-w-3xl rounded-[32px] border shadow-2xl', ui.surface)}>
+      <div className={cx('w-full max-w-2xl max-h-[84dvh] overflow-hidden rounded-[28px] border shadow-2xl', ui.surface)}>
         <div className="flex items-center justify-between border-b border-zinc-200 p-6 dark:border-zinc-800">
           <div>
             <div className={cx('text-sm font-bold uppercase tracking-[0.18em]', ui.muted)}>Account</div>
@@ -1599,8 +1629,8 @@ function AccountSettingsModal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="grid gap-0 lg:grid-cols-[1fr_1fr]">
-          <form onSubmit={saveProfile} className="space-y-4 p-6">
+        <div className="app-scrollbar grid max-h-[calc(84dvh-88px)] gap-0 overflow-y-auto lg:grid-cols-[1fr_1fr]">
+          <form onSubmit={saveProfile} className="space-y-3 p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <PencilLine className="h-5 w-5" />
               <h3 className={cx('text-lg font-black', ui.strong)}>资料信息</h3>
@@ -1620,7 +1650,7 @@ function AccountSettingsModal({
               {savingProfile ? '保存中...' : '保存资料'}
             </button>
           </form>
-          <form onSubmit={savePassword} className="space-y-4 border-t border-zinc-200 p-6 dark:border-zinc-800 lg:border-l lg:border-t-0">
+          <form onSubmit={savePassword} className="space-y-3 border-t border-zinc-200 p-4 dark:border-zinc-800 sm:p-5 lg:border-l lg:border-t-0">
             <div className="flex items-center gap-2">
               <Lock className="h-5 w-5" />
               <h3 className={cx('text-lg font-black', ui.strong)}>安全设置</h3>
@@ -1643,7 +1673,7 @@ function AccountSettingsModal({
           </form>
         </div>
         {(message || error) ? (
-          <div className="px-6 pb-6">
+          <div className="px-4 pb-4 sm:px-5 sm:pb-5">
             <div className={cx('rounded-2xl border px-4 py-3 text-sm font-bold', error ? 'border-red-200 bg-red-50 text-red-600' : 'border-emerald-200 bg-emerald-50 text-emerald-600')}>
               {error || message}
             </div>
